@@ -8,9 +8,6 @@ class HomeController extends Controller
 {
     public function index(): View
     {
-        return view('home', [
-            'appName' => 'LibraryHub',
-            'description' => 'Tra cứu sách và quản lý hoạt động mượn trả.',
-        ]);
+        return view('home');
     }
 }
