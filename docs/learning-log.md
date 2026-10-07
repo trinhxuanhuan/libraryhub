@@ -44,3 +44,18 @@
 - Thực hành Eloquent và CRUD thể loại.
 - Củng cố luồng route–controller–model–view qua chức năng thực tế.
 - Xử lý góp ý từ các PR.
+## Quản lý thể loại — FR-09
+### Đã thực hiện
+- Hoàn thành danh sách, thêm, sửa và xóa thể loại bằng Eloquent.
+- Dùng Form Request kiểm tra dữ liệu và tên thể loại không trùng.
+- Hiển thị thông báo thành công, lỗi và xác nhận trước khi xóa.
+- Chặn xóa thể loại đang có sách liên kết.
+
+### Đã kiểm tra
+- Thêm, sửa và xóa trên web cập nhật đúng dữ liệu trong MySQL.
+- Thể loại đang có sách bị chặn xóa và hiển thị thông báo lỗi.
+- Chạy Laravel Pint, đã sửa các lỗi định dạng code.
+
+### Cần củng cố
+- Luồng request qua route, Form Request, controller và model.
+- Phân biệt response trả giao diện với response chuyển hướng.
