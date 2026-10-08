@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreCategoryRequest;
-use App\Http\Requests\UpdateCategoryRequest;
+use App\Http\Requests\CategoryRequest;
 use App\Models\Category;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class CategoryController extends Controller
@@ -29,7 +27,7 @@ class CategoryController extends Controller
         return view('admin.categories.create');
     }
 
-    public function store(StoreCategoryRequest $request): RedirectResponse
+    public function store(CategoryRequest $request): RedirectResponse
     {
         Category::create($request->validated());
 
@@ -46,7 +44,7 @@ class CategoryController extends Controller
     }
 
     public function update(
-        UpdateCategoryRequest $request,
+        CategoryRequest $request,
         Category $category
     ): RedirectResponse {
         $category->update($request->validated());
@@ -58,8 +56,8 @@ class CategoryController extends Controller
 
     public function destroy(Category $category): RedirectResponse
     {
-        $hasBooks = DB::table('books')
-            ->where('category_id', $category->id)
+        $hasBooks = $category->books()
+            ->withTrashed()
             ->exists();
 
         if ($hasBooks) {
