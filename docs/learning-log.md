@@ -19,6 +19,10 @@
 - Luồng request đi qua route, controller và view.
 - Cách @extends, @section và @yield ghép nội dung vào layout.
 
+### Kế hoạch tiếp theo
+- Kiểm tra giao diện Home/About và gửi PR vào develop.
+- Học migration, seeder và Tinker để xây dựng CSDL thư viện.
+
 ## Cấu trúc CSDL và dữ liệu mẫu
 
 ### Đã thực hiện
