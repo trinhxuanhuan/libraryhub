@@ -33,7 +33,7 @@ class CategoryController extends Controller
 
         return redirect()
             ->route('admin.categories.index')
-            ->with('success', 'Đã thêm thể loại thành công.');
+            ->with('success', __('message.categories.created'));
     }
 
     public function edit(Category $category): View
@@ -51,7 +51,7 @@ class CategoryController extends Controller
 
         return redirect()
             ->route('admin.categories.index')
-            ->with('success', 'Đã cập nhật thể loại thành công.');
+            ->with('success', __('message.categories.updated'));
     }
 
     public function destroy(Category $category): RedirectResponse
@@ -63,7 +63,7 @@ class CategoryController extends Controller
         if ($hasBooks) {
             return redirect()
                 ->route('admin.categories.index')
-                ->with('error', 'Không thể xóa thể loại đang có sách.');
+                ->with('error', __('message.categories.delete_blocked'));
         }
 
         try {
@@ -76,11 +76,11 @@ class CategoryController extends Controller
 
             return redirect()
                 ->route('admin.categories.index')
-                ->with('error', 'Không thể xóa thể loại đang có sách.');
+                ->with('error', __('message.categories.deleted_blocked'));
         }
 
         return redirect()
             ->route('admin.categories.index')
-            ->with('success', 'Đã xóa thể loại thành công.');
+            ->with('success', __('message.categories.deleted'));
     }
 }
