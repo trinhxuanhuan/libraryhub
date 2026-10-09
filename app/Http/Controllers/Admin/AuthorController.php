@@ -47,10 +47,32 @@ class AuthorController extends Controller
     {
         $author->update($request->validated());
 
-    return redirect()
-        ->route('admin.authors.index')
-        ->with('success', 'Đã cập nhật tác giả thành công.');
+        return redirect()
+            ->route('admin.authors.index')
+            ->with('success', 'Đã cập nhật tác giả thành công.');
+    }
+
+    public function destroy(Author $author): RedirectResponse
+    {
+        $hasBooks = $author->books()
+            ->withTrashed()
+            ->exists();
+
+        if ($hasBooks) {
+            return redirect()
+                ->route('admin.authors.index')
+                ->with(
+                    'error',
+                    'Không thể xóa tác giả còn liên kết với sách.'
+                );
+        }
+
+        $author->delete();
+        return redirect()
+            ->route('admin.authors.index')
+            ->with('success', 'Đã xóa tác giả thành công.');
     }
 }
+
 
 

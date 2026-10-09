@@ -30,10 +30,27 @@
                                 <td>{{ $author->bio ?? 'Chưa có tiểu sử' }}</td>
                                 <td>{{ $author->books_count }}</td>
                                 <td>
-                                    <a href="{{ route('admin.authors.edit', $author) }}"
-                                    class="btn btn-sm btn-outline-primary">
-                                    Sửa
-                                    </a>
+                                    <div class="d-flex gap-2">
+                                        <a
+                                            href="{{ route('admin.authors.edit', $author) }}"
+                                            class="btn btn-sm btn-outline-primary"
+                                        >
+                                            Sửa
+                                        </a>
+
+                                        <form
+                                            method="post"
+                                            action="{{ route('admin.authors.destroy', $author) }}"
+                                            onsubmit="return confirm('Bạn có chắc muốn xóa tác giả này?');"
+                                        >
+                                            @csrf
+                                            @method('DELETE')
+
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                Xóa
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         @empty

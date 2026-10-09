@@ -17,7 +17,7 @@ Route::resource('admin/categories', CategoryController::class)
     ->names('admin.categories');
 
 Route::resource('admin/authors', AuthorController::class)
-    ->only(['index', 'create', 'store', 'edit', 'update'])
+    ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
     ->names('admin.authors');
 
 
