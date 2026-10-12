@@ -76,7 +76,7 @@ class CategoryController extends Controller
 
             return redirect()
                 ->route('admin.categories.index')
-                ->with('error', __('message.categories.deleted_blocked'));
+                ->with('error', __('message.categories.delete_blocked'));
         }
 
         return redirect()
