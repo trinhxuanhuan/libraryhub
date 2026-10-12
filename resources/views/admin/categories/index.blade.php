@@ -1,4 +1,3 @@
-
 @extends('layouts.app')
 
 @section('title', 'Quản lý thể loại — LibraryHub')
