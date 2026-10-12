@@ -34,8 +34,9 @@ class AuthorController extends Controller
 
         return redirect()
             ->route('admin.authors.index')
-            ->with('success', 'Đã thêm tác giả thành công.');
+            ->with('success', __('message.authors.created'));
     }
+
     public function edit(Author $author): View
     {
         return view('admin.authors.edit', [
@@ -49,7 +50,7 @@ class AuthorController extends Controller
 
         return redirect()
             ->route('admin.authors.index')
-            ->with('success', 'Đã cập nhật tác giả thành công.');
+            ->with('success', __('message.authors.updated'));
     }
 
     public function destroy(Author $author): RedirectResponse
@@ -63,16 +64,14 @@ class AuthorController extends Controller
                 ->route('admin.authors.index')
                 ->with(
                     'error',
-                    'Không thể xóa tác giả còn liên kết với sách.'
+                    __('message.authors.delete_blocked')
                 );
         }
 
         $author->delete();
+
         return redirect()
             ->route('admin.authors.index')
-            ->with('success', 'Đã xóa tác giả thành công.');
+            ->with('success', __('message.authors.deleted'));
     }
 }
-
-
-
