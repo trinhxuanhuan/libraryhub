@@ -36,3 +36,4 @@ class CategoryRequest extends FormRequest
         ];
     }
 }
+
