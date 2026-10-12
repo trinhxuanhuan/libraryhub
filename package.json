@@ -18,5 +18,10 @@
     },
     "allowScripts": {
         "esbuild@0.28.2": true
+    },
+    "overrides": {
+        "concurrently": {
+            "shell-quote": "1.11.0"
+        }
     }
 }
