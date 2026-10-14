@@ -84,4 +84,13 @@ class BookController extends Controller
             ->route('admin.books.index')
             ->with('success', __('message.books.updated'));
     }
+
+    public function destroy(Book $book): RedirectResponse
+    {
+        $book->delete();
+
+        return redirect()
+            ->route('admin.books.index')
+            ->with('success', __('message.books.deleted'));
+    }
 }

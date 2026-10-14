@@ -22,5 +22,5 @@ Route::resource('admin/authors', AuthorController::class)
     ->names('admin.authors');
 
 Route::resource('admin/books', BookController::class)
-    ->only(['index', 'create', 'store', 'edit', 'update'])
+    ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
     ->names('admin.books');
