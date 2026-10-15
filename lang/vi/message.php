@@ -16,4 +16,11 @@ return [
         'deleted' => 'Đã xóa tác giả thành công.',
         'delete_blocked' => 'Không thể xóa tác giả vì có sách liên quan.',
     ],
+
+    'books' => [
+        'created' => 'Thêm sách thành công.',
+        'updated' => 'Cập nhật sách thành công.',
+        'save_failed' => 'Không thể lưu thông tin sách. Vui lòng thử lại.',
+        'deleted' => 'Xóa sách thành công.',
+    ],
 ];
