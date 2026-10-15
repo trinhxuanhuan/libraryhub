@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Http\Controllers\AboutController;
@@ -5,6 +6,7 @@ use App\Http\Controllers\Admin\AuthorController;
 use App\Http\Controllers\Admin\BookController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\HomeController;
+use Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])
@@ -23,4 +25,8 @@ Route::resource('admin/authors', AuthorController::class)
 
 Route::resource('admin/books', BookController::class)
     ->only(['index', 'create', 'store', 'edit', 'update'])
-    ->names('admin.books');
+    ->names('admin.books')
+    ->middlewareFor(
+        ['store', 'update'],
+        HandlePrecognitiveRequests::class
+    );

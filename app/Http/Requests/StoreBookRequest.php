@@ -34,12 +34,12 @@ class StoreBookRequest extends FormRequest
 
             'description' => ['nullable', 'string'],
 
-            'publisher' => ['nullable', 'string', 'max:150'],
+            'publisher' => ['required', 'string', 'max:150'],
 
             'published_year' => [
                 'required',
                 'integer',
-                'between:1,'.date('Y'),
+                'between:1800,'.date('Y'),
             ],
 
             'total_copies' => ['required', 'integer', 'min:0'],
