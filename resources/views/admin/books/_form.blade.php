@@ -1,4 +1,3 @@
-
 @php
     $selectedAuthorIds = old(
         'author_ids',
@@ -230,6 +229,25 @@
     </div>
 </div>
 
+{{-- Ảnh bìa sách --}}
+<div class="mb-3">
+    <label for="cover" class="form-label">Ảnh bìa sách</label>
+
+    <input
+        type="file"
+        id="cover"
+        name="cover"
+        accept="image/jpeg,image/png,image/webp"
+        class="form-control @error('cover') is-invalid @enderror"
+    >
+
+    <div id="cover-error" class="invalid-feedback">
+        @error('cover')
+            {{ $message }}
+        @enderror
+    </div>
+</div>
+
 {{-- Real-time Validation --}}
 <script>
     (() => {
@@ -281,6 +299,9 @@
 
             // Lấy dữ liệu hiện tại từ toàn bộ form
             const data = new FormData(form);
+            if (field !== 'cover') {
+                data.delete('cover');
+            }
 
             // Chỉ validate trường đang thay đổi
             const validateOnly = field === 'author_ids'
@@ -373,6 +394,11 @@
             .addEventListener('change', () => {
                 scheduleValidation('category_id');
             });
+        //Ảnh bìa sách
+        const coverInput = document.getElementById('cover');
+        coverInput.addEventListener('change', () => {
+            scheduleValidation('cover');
+        });
 
         // Tác giả
         const authorCheckboxes = document.querySelectorAll(

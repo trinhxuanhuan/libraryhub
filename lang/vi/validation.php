@@ -11,9 +11,12 @@ return [
     'exists' => ':attribute không tồn tại.',
     'unique' => ':attribute đã tồn tại.',
     'distinct' => ':attribute không được trùng lặp.',
+    'image' => ':attribute phải là hình ảnh.',
+    'mimes' => ':attribute phải có định dạng: :values.',
 
     'max' => [
         'string' => ':attribute không được quá :max ký tự.',
+        'file' => ':attribute không được lớn hơn :max KB.',
     ],
 
     'min' => [
@@ -41,6 +44,7 @@ return [
         'available_copies' => 'Số bản còn lại',
         'author_ids' => 'Tác giả',
         'author_ids.*' => 'Tác giả được chọn',
+        'cover' => 'Ảnh bìa sách',
     ],
 
     // Những thông báo cần diễn đạt riêng

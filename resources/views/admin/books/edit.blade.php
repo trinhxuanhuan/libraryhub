@@ -7,8 +7,12 @@
         <div class="card-body">
             <h1 class="h3 mb-3">Sửa sách</h1>
 
-            <form method="POST"
-                  action="{{ route('admin.books.update', $book) }}">
+            <form
+                action="{{ route('admin.books.update', $book) }}"
+                method="POST"
+                enctype="multipart/form-data"
+                novalidate
+            >
                 @csrf
                 @method('PUT')
 

@@ -64,6 +64,12 @@ class BookController extends Controller
     public function store(StoreBookRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        if ($request->hasFile('cover')) {
+            $path = $request->file('cover')
+                ->store('book-covers', 'public');
+
+            $data['cover_path'] = $path;
+        }
 
         $authorIds = $data['author_ids'];
         unset($data['author_ids']);
