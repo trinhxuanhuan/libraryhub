@@ -11,19 +11,44 @@ use App\Models\Author;
 use App\Models\Book;
 use App\Models\Category;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
+
 class BookController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $books = Book::with(['category', 'authors'])
-            ->orderBy('id')
-            ->get();
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+        ]);
+
+        $search = trim($filters['search'] ?? '');
+        $categoryId = $filters['category_id'] ?? null;
+
+        $query = Book::with(['category', 'authors'])
+            ->orderBy('id');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('isbn', 'like', "%{$search}%");
+            });
+        }
+
+        if ($categoryId !== null) {
+            $query->where('category_id', $categoryId);
+        }
+
+        $books = $query->paginate(10)->withQueryString();
+
+        $categories = Category::orderBy('name')->get();
 
         return view('admin.books.index', [
             'books' => $books,
+            'categories' => $categories,
         ]);
     }
 
