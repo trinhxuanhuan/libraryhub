@@ -231,8 +231,23 @@
 
 {{-- Ảnh bìa sách --}}
 <div class="mb-3">
-    <label for="cover" class="form-label">Ảnh bìa sách</label>
+    <label class="form-label">Ảnh bìa sách</label>
 
+    {{-- Hiển thị ảnh hiện tại khi sửa sách --}}
+    @if ($book->exists && $book->cover_path)
+        <div class="mb-3">
+            <p class="mb-2">Ảnh bìa hiện tại:</p>
+
+            <img
+                src="{{ Storage::disk('public')->url($book->cover_path) }}"
+                alt="{{ $book->title }}"
+                style="width: 120px; height: auto;"
+                class="img-thumbnail"
+            >
+        </div>
+    @endif
+
+    {{-- Chọn ảnh mới --}}
     <input
         type="file"
         id="cover"
@@ -246,6 +261,12 @@
             {{ $message }}
         @enderror
     </div>
+
+    @if ($book->exists && $book->cover_path)
+        <div class="form-text">
+            Không chọn ảnh mới nếu muốn giữ nguyên ảnh hiện tại.
+        </div>
+    @endif
 </div>
 
 {{-- Real-time Validation --}}

@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreBookRequest;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Requests\UpdateBookRequest;
 use App\Models\Author;
 use App\Models\Book;
@@ -103,13 +104,41 @@ class BookController extends Controller
         $data = $request->validated();
 
         $authorIds = $data['author_ids'];
-        unset($data['author_ids']);
+        unset($data['author_ids'], $data['cover']);
 
-        DB::transaction(function () use ($book, $data, $authorIds) {
-            $book->update($data);
+        $oldCoverPath = $book->cover_path;
+        $newCoverPath = null;
 
-            $book->authors()->sync($authorIds);
-        });
+        try {
+            if ($request->hasFile('cover')) {
+                $newCoverPath = $request->file('cover')
+                    ->store('book-covers', 'public');
+
+                if ($newCoverPath === false) {
+                    throw new \RuntimeException('Không thể lưu ảnh bìa.');
+                }
+
+                $data['cover_path'] = $newCoverPath;
+            }
+
+            DB::transaction(function () use ($book, $data, $authorIds) {
+                $book->update($data);
+
+                $book->authors()->sync($authorIds);
+            });
+        } catch (\Throwable $e) {
+            // Nếu DB lỗi, xóa ảnh mới vừa upload
+            if ($newCoverPath) {
+                Storage::disk('public')->delete($newCoverPath);
+            }
+
+            throw $e;
+        }
+
+        // DB thành công thì mới xóa ảnh cũ
+        if ($newCoverPath && $oldCoverPath) {
+            Storage::disk('public')->delete($oldCoverPath);
+        }
 
         return redirect()
             ->route('admin.books.index')
