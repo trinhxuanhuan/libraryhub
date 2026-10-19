@@ -21,5 +21,6 @@ return [
         'created' => 'Thêm sách thành công.',
         'updated' => 'Cập nhật sách thành công.',
         'save_failed' => 'Không thể lưu thông tin sách. Vui lòng thử lại.',
+        'deleted' => 'Xóa sách thành công.',
     ],
 ];
