@@ -52,67 +52,32 @@
                 </div>
             </form>
 
-            <div class="table-responsive">
-                <table class="table table-striped align-middle">
-                    <thead>
-                        <tr>
-                            <th>Mã</th>
-                            <th>ISBN</th>
-                            <th>Tên sách</th>
-                            <th>Thể loại</th>
-                            <th>Tác giả</th>
-                            <th>Số bản còn lại</th>
-                            <th>Thao tác</th>
-                        </tr>
-                    </thead>
+            @php
+                    $headers = [
+                        'Mã',
+                        'ISBN',
+                        'Tên sách',
+                        'Thể loại',
+                        'Tác giả',
+                        'Số bản còn lại',
+                        'Thao tác',
+                    ];
 
-                    <tbody>
-                        @forelse ($books as $book)
-                            <tr>
-                                <td>{{ $book->id }}</td>
-                                <td>{{ $book->isbn }}</td>
-                                <td>{{ $book->title }}</td>
-                                <td>{{ $book->category->name }}</td>
-                                <td>{{ $book->authors->pluck('name')->join(', ') }}</td>
-                                <td>
-                                    {{ $book->available_copies }}
-                                    /
-                                    {{ $book->total_copies }}
-                                </td>
-                                <td>
-                                    <div class="d-flex gap-2">
-                                        <a
-                                            href="{{ route('admin.books.edit', $book) }}"
-                                            class="btn btn-warning btn-sm"
-                                        >
-                                            Sửa
-                                        </a>
+                    $data = $books->map(function ($book) {
+                        return [
+                            $book->id,
+                            $book->isbn,
+                            $book->title,
+                            $book->category?->name ?? '-',
+                            $book->authors->pluck('name')->join(', '),
+                            $book->available_copies . ' / ' . $book->total_copies,
+                            view('admin.books._actions', ['book' => $book]),
+                        ];
+                    });
+                @endphp
 
-                                        <form
-                                            action="{{ route('admin.books.destroy', $book) }}"
-                                            method="POST"
-                                            onsubmit="return confirm('Bạn có chắc chắn muốn xóa sách này không?');"
-                                        >
-                                            @csrf
-                                            @method('DELETE')
+                <x-common.table :headers="$headers" :data="$data" />
 
-                                            <button type="submit" class="btn btn-danger btn-sm">
-                                                Xóa
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center text-muted">
-                                    Chưa có sách nào.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
                 <div class="mt-3">
                     {{ $books->links('pagination::bootstrap-5') }}
                 </div>
