@@ -1,0 +1,4 @@
+[90m= [39m[34;4mApp\Enums\UserRole[39;24m {#8118
+    +[1mname[22m: [32m"[39m[32mAdmin[39m[32m"[39m,
+    +[1mvalue[22m: [32m"[39m[32madmin[39m[32m"[39m,
+  }

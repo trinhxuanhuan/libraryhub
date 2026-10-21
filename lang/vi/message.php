@@ -23,4 +23,15 @@ return [
         'save_failed' => 'Không thể lưu thông tin sách. Vui lòng thử lại.',
         'deleted' => 'Xóa sách thành công.',
     ],
+
+    'auth' => [
+        'registered' => 'Đăng ký tài khoản thành công.',
+        'logged_in' => 'Đăng nhập thành công.',
+        'failed' => 'Email hoặc mật khẩu không chính xác.',
+        'logged_out' => 'Đăng xuất thành công.',
+        'inactive' => 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.',
+    ],
+    'users' => [
+        'updated' => 'Cập nhật người dùng thành công.',
+    ],
 ];

@@ -28,7 +28,7 @@
             </button>
 
             <div class="collapse navbar-collapse" id="mainMenu">
-                <div class="navbar-nav ms-auto">
+                <div class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
                     <a
                         class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}"
                         href="{{ route('home') }}"
@@ -42,6 +42,61 @@
                     >
                         Giới thiệu
                     </a>
+
+                    @guest
+                        <a
+                            class="nav-link {{ request()->routeIs('login') ? 'active' : '' }}"
+                            href="{{ route('login') }}"
+                        >
+                            Đăng nhập
+                        </a>
+
+                        <a
+                            class="btn btn-primary"
+                            href="{{ route('register') }}"
+                        >
+                            Đăng ký
+                        </a>
+                    @endguest
+
+                    @auth
+                        @if (auth()->user()->role === \App\Enums\UserRole::Admin)
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('admin.books.index') }}">
+                                    Sách
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('admin.authors.index') }}">
+                                    Tác giả
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('admin.categories.index') }}">
+                                    Thể loại
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('admin.users.index') }}">
+                                    Người dùng
+                                </a>
+                            </li>
+                        @endif
+
+                        <span class="navbar-text">
+                            {{ auth()->user()->name }}
+                        </span>
+
+                        <form action="{{ route('logout') }}" method="POST">
+                            @csrf
+
+                            <button type="submit" class="btn btn-outline-danger">
+                                Đăng xuất
+                            </button>
+                        </form>
+                    @endauth
                 </div>
             </div>
         </div>
