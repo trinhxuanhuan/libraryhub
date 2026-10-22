@@ -9,6 +9,10 @@ class ManualAuthenticator
 {
     private const SESSION_KEY = 'manual_auth_user_id';
 
+    public function __construct(
+        private readonly PasswordHasher $passwordHasher
+    ) {}
+
     // Xác minh email và mật khẩu
     public function verifyCredentials(
         string $email,
@@ -20,7 +24,7 @@ class ManualAuthenticator
             return null;
         }
 
-        $isCorrectPassword = password_verify(
+        $isCorrectPassword = $this->passwordHasher->verify(
             $password,
             $user->password
         );

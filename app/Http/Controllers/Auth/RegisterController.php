@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRegisterRequest;
 use App\Models\User;
+use App\Services\PasswordHasher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -15,14 +16,12 @@ class RegisterController extends Controller
         return view('auth.register');
     }
 
-    public function store(StoreRegisterRequest $request): RedirectResponse
+    public function store(StoreRegisterRequest $request, PasswordHasher $passwordHasher): RedirectResponse
     {
         $validated = $request->validated();
 
-        $hashedPassword = password_hash(
-            $validated['password'],
-            PASSWORD_BCRYPT,
-            ['cost' => (int) config('hashing.bcrypt.rounds', 12)]
+        $hashedPassword = $passwordHasher->hash(
+            $validated['password']
         );
 
         User::create([
