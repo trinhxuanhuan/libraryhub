@@ -128,47 +128,76 @@
     </div>
 </div>
 
+
 {{-- Tổng số bản --}}
 <div class="mb-3">
-    <label for="total_copies" class="form-label">Tổng số bản*</label>
+    <label for="total_copies" class="form-label">
+        Tổng số bản*
+    </label>
 
     <input
         type="number"
         id="total_copies"
         name="total_copies"
-        min="0"
+        min="{{ $book->exists ? $book->total_copies : 0 }}"
         class="form-control @error('total_copies') is-invalid @enderror"
         value="{{ old('total_copies', $book->total_copies) }}"
+        required
     >
 
-    <div id="total_copies-error" class="invalid-feedback">
-        @error('total_copies')
+    @error('total_copies')
+        <div class="invalid-feedback">
             {{ $message }}
-        @enderror
-    </div>
+        </div>
+    @enderror
+
+    @if ($book->exists)
+        <div class="form-text">
+            Chỉ được tăng hoặc giữ nguyên tổng số bản sách.
+        </div>
+    @endif
 </div>
 
-{{-- Số bản còn lại --}}
+{{-- Số bản khả dụng --}}
 <div class="mb-3">
     <label for="available_copies" class="form-label">
-        Số bản còn lại*
+        Số bản khả dụng
     </label>
 
-    <input
-        type="number"
-        id="available_copies"
-        name="available_copies"
-        min="0"
-        class="form-control @error('available_copies') is-invalid @enderror"
-        value="{{ old('available_copies', $book->available_copies) }}"
-    >
+    @if ($book->exists)
+        {{-- Edit: Chỉ hiển thị --}}
+        <input
+            type="number"
+            id="available_copies"
+            class="form-control"
+            value="{{ $book->available_copies }}"
+            readonly
+        >
 
-    <div id="available_copies-error" class="invalid-feedback">
+        <div class="form-text">
+            Số lượng được quản lý theo trạng thái
+            từng bản sách, không chỉnh sửa trực tiếp.
+        </div>
+    @else
+        {{-- Create: Nhập số bản khả dụng ban đầu --}}
+        <input
+            type="number"
+            id="available_copies"
+            name="available_copies"
+            min="0"
+            class="form-control @error('available_copies') is-invalid @enderror"
+            value="{{ old('available_copies', $book->available_copies) }}"
+            required
+        >
+
         @error('available_copies')
-            {{ $message }}
+            <div class="invalid-feedback">
+                {{ $message }}
+            </div>
         @enderror
-    </div>
+    @endif
 </div>
+
 
 {{-- Tác giả --}}
 <div class="mb-3">

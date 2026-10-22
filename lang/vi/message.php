@@ -22,6 +22,8 @@ return [
         'updated' => 'Cập nhật sách thành công.',
         'save_failed' => 'Không thể lưu thông tin sách. Vui lòng thử lại.',
         'deleted' => 'Xóa sách thành công.',
+        'quantity_out_of_sync' => 'Số lượng sách đang không đồng bộ.',
+        'decrease_copies_not_supported' => 'Chưa hỗ trợ giảm số bản sách.',
     ],
 
     'auth' => [
