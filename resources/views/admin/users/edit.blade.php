@@ -24,7 +24,7 @@
 
                     @foreach (\App\Enums\UserRole::cases() as $role)
                         <option value="{{ $role->value }}"
-                            @selected(old('role', $user->role->value) === $role->value)>
+                            @selected((string) old('role', $user->role->value) === (string) $role->value)>
                             {{ $role->name }}
                         </option>
                     @endforeach

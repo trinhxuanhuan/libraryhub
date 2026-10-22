@@ -142,4 +142,23 @@ class ManualAuthenticationTest extends TestCase
         $this->get(route('admin.books.index'))
             ->assertRedirect(route('login'));
     }
+
+    public function test_user_can_login_with_email_in_different_case(): void
+    {
+        $password = 'Password123!';
+
+        $user = User::factory()->create([
+            'email' => 'demo@example.com',
+            'password' => password_hash(
+                $password,
+                PASSWORD_BCRYPT,
+                ['cost' => (int) config('hashing.bcrypt.rounds', 12)]
+            ),
+        ]);
+
+        $this->post('/login', [
+            'email' => '  Demo@EXAMPLE.COM  ',
+            'password' => $password,
+        ])->assertSessionHas('manual_auth_user_id', $user->id);
+    }
 }

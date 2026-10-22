@@ -24,8 +24,8 @@ class CheckRole
             return redirect()->guest(route('login'));
         }
 
-        if (! in_array($user->role->value, $roles, true)) {
-            abort(403, 'Bạn không có quyền truy cập chức năng này.');
+        if (! in_array($user->role->key(), $roles, true)) {
+            abort(403, __('message.authorization.forbidden'));
         }
 
         return $next($request);

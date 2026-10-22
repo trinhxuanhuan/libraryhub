@@ -19,7 +19,7 @@
                     $user->id,
                     $user->name,
                     $user->email,
-                    $user->role->value,
+                    $user->role->name,
                     $user->is_active ? 'Hoạt động' : 'Đã khóa',
                     view('admin.users._actions', ['user' => $user]),
                 ];

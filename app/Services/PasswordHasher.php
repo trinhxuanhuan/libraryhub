@@ -13,7 +13,8 @@ class PasswordHasher
         );
     }
 
-    public function verify(string $password, string $hashedPassword): bool {
+    public function verify(string $password, string $hashedPassword): bool
+    {
         return password_verify(
             $password,
             $hashedPassword

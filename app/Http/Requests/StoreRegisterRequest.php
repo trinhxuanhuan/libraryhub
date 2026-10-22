@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\EmailNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRegisterRequest extends FormRequest
@@ -19,5 +20,16 @@ class StoreRegisterRequest extends FormRequest
             'password' => ['required', 'string', 'min:8'],
             'password_confirmation' => ['required', 'same:password'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $email = $this->input('email');
+
+        if (is_string($email)) {
+            $this->merge([
+                'email' => EmailNormalizer::normalize($email),
+            ]);
+        }
     }
 }

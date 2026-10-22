@@ -33,5 +33,11 @@ return [
     ],
     'users' => [
         'updated' => 'Cập nhật người dùng thành công.',
+        'cannot_self_demote' => 'Bạn không thể tự hạ quyền Admin.',
+        'cannot_self_deactivate' => 'Bạn không thể tự khóa tài khoản.',
+    ],
+
+    'authorization' => [
+        'forbidden' => 'Bạn không có quyền truy cập chức năng này.',
     ],
 ];

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\EmailNormalizer;
 use Illuminate\Http\Request;
 
 class ManualAuthenticator
@@ -14,10 +15,10 @@ class ManualAuthenticator
     ) {}
 
     // Xác minh email và mật khẩu
-    public function verifyCredentials(
-        string $email,
-        string $password
-    ): ?User {
+    public function verifyCredentials(string $email, string $password): ?User
+    {
+        $email = EmailNormalizer::normalize($email);
+
         $user = User::where('email', $email)->first();
 
         if ($user === null) {

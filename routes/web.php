@@ -5,7 +5,7 @@ use App\Http\Controllers\Admin\AuthorController;
 use App\Http\Controllers\Admin\BookController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\HomeController;
 use Illuminate\Support\Facades\Route;
@@ -46,14 +46,14 @@ Route::middleware('manual.guest')->group(function () {
     Route::post('/register', [RegisterController::class, 'store'])
         ->name('register.store');
 
-    Route::get('/login', [LoginController::class, 'create'])
+    Route::get('/login', [AuthController::class, 'create'])
         ->name('login');
 
-    Route::post('/login', [LoginController::class, 'store'])
+    Route::post('/login', [AuthController::class, 'store'])
         ->middleware('throttle:5,1')
         ->name('login.store');
 });
 
-Route::post('/logout', [LoginController::class, 'destroy'])
+Route::post('/logout', [AuthController::class, 'destroy'])
     ->middleware('manual.auth')
     ->name('logout');

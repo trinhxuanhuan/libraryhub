@@ -9,7 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-class LoginController extends Controller
+class AuthController extends Controller
 {
     public function create(): View
     {
