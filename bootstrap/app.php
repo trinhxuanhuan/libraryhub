@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\CheckManualAuth;
+use App\Http\Middleware\CheckManualGuest;
 use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Foundation\Application;
@@ -16,8 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'role' => CheckRole::class,
+            'manual.auth' => CheckManualAuth::class,
+            'manual.guest' => CheckManualGuest::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
-        //
-    })->create();
+    ->withExceptions(function (Exceptions $exceptions): void {})->create();

@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
+use App\Services\ManualAuthenticator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class LoginController extends Controller
@@ -16,17 +16,22 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
-    public function store(LoginRequest $request): RedirectResponse
-    {
+    public function store(
+        LoginRequest $request,
+        ManualAuthenticator $authenticator
+    ): RedirectResponse {
+        // Lấy dữ liệu đã validate
         $validated = $request->validated();
 
-        $credentials = [
-            'email' => $validated['email'],
-            'password' => $validated['password'],
-            'is_active' => true,
-        ];
+        // Tự thực hiện xác thực và tạo Session
+        $isAuthenticated = $authenticator->login(
+            $request,
+            $validated['email'],
+            $validated['password']
+        );
 
-        if (! Auth::attempt($credentials)) {
+        // Xử lý đăng nhập thất bại
+        if (! $isAuthenticated) {
             return back()
                 ->withErrors([
                     'email' => __('message.auth.failed'),
@@ -34,20 +39,18 @@ class LoginController extends Controller
                 ->onlyInput('email');
         }
 
-        $request->session()->regenerate();
-
+        // Đăng nhập thành công
         return redirect()
             ->intended(route('home'))
             ->with('success', __('message.auth.logged_in'));
     }
 
-    public function destroy(Request $request): RedirectResponse
-    {
-        Auth::logout();
-
-        $request->session()->invalidate();
-
-        $request->session()->regenerateToken();
+    public function destroy(
+        Request $request,
+        ManualAuthenticator $authenticator
+    ): RedirectResponse {
+        // Hủy phiên đăng nhập
+        $authenticator->logout($request);
 
         return redirect()
             ->route('home')

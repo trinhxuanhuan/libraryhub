@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRegisterRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class RegisterController extends Controller
@@ -20,10 +19,16 @@ class RegisterController extends Controller
     {
         $validated = $request->validated();
 
+        $hashedPassword = password_hash(
+            $validated['password'],
+            PASSWORD_BCRYPT,
+            ['cost' => (int) config('hashing.bcrypt.rounds', 12)]
+        );
+
         User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
+            'password' => $hashedPassword,
         ]);
 
         return redirect()
