@@ -42,4 +42,9 @@ class Book extends Model
     {
         return $this->hasMany(BookCopy::class);
     }
+
+    public function loanItems(): HasMany
+    {
+        return $this->hasMany(LoanItem::class);
+    }
 }

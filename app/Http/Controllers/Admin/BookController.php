@@ -14,6 +14,7 @@ use App\Models\Category;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -67,30 +68,55 @@ class BookController extends Controller
         $data = $request->validated();
 
         $authorIds = $data['author_ids'];
-        unset($data['author_ids']);
 
-        DB::transaction(function () use ($data, $authorIds) {
-            // Đầu sách
-            $book = Book::create($data);
+        // File upload không được đưa trực tiếp vào Book::create()
+        unset($data['author_ids'], $data['cover']);
 
-            // Liên kết tác giả
-            $book->authors()->sync($authorIds);
+        $newCoverPath = null;
 
-            // Tạo từng bản sách vật lý
-            for ($i = 1; $i <= $book->total_copies; $i++) {
-                $book->copies()->create([
-                    'barcode' => sprintf(
-                        'COPY-%06d-%04d',
-                        $book->id,
-                        $i
-                    ),
+        try {
+            // Upload ảnh bìa nếu Admin đã chọn file
+            if ($request->hasFile('cover')) {
+                $newCoverPath = $request->file('cover')
+                    ->store('book-covers', 'public');
 
-                    'status' => $i <= $book->available_copies
-                        ? BookCopyStatus::Available
-                        : BookCopyStatus::Unverified,
-                ]);
+                if ($newCoverPath === false) {
+                    throw new \RuntimeException('Unable to store book cover.');
+                }
+
+                // Lưu đường dẫn ảnh vào bảng books
+                $data['cover_path'] = $newCoverPath;
             }
-        });
+
+            DB::transaction(function () use ($data, $authorIds) {
+                // Tạo đầu sách
+                $book = Book::create($data);
+
+                // Liên kết tác giả
+                $book->authors()->sync($authorIds);
+
+                // Tạo từng bản sách vật lý
+                for ($i = 1; $i <= $book->total_copies; $i++) {
+                    $book->copies()->create([
+                        'barcode' => sprintf(
+                            'COPY-%06d-%04d',
+                            $book->id,
+                            $i
+                        ),
+                        'status' => $i <= $book->available_copies
+                            ? BookCopyStatus::Available
+                            : BookCopyStatus::Unverified,
+                    ]);
+                }
+            });
+        } catch (\Throwable $e) {
+            // Nếu Transaction lỗi, xóa ảnh vừa upload
+            if ($newCoverPath !== null && $newCoverPath !== false) {
+                Storage::disk('public')->delete($newCoverPath);
+            }
+
+            throw $e;
+        }
 
         return redirect()
             ->route('admin.books.index')
@@ -115,58 +141,100 @@ class BookController extends Controller
         $data = $request->validated();
 
         $authorIds = $data['author_ids'];
-        unset($data['author_ids']);
+        unset($data['author_ids'], $data['cover']);
 
-        DB::transaction(function () use ($book, $data, $authorIds) {
-            // Khóa đầu sách trong lúc cập nhật
-            $book = Book::query()
-                ->lockForUpdate()
-                ->findOrFail($book->id);
+        $newCoverPath = null;
+        $oldCoverPath = null;
 
-            // Lấy số lượng thực tế từ book_copies
-            $currentTotal = $book->copies()->count();
+        try {
+            // Upload ảnh mới nếu Admin có chọn
+            if ($request->hasFile('cover')) {
+                $newCoverPath = $request->file('cover')
+                    ->store('book-covers', 'public');
 
-            $currentAvailable = $book->copies()
-                ->where('status', BookCopyStatus::Available->value)
-                ->count();
+                if ($newCoverPath === false) {
+                    throw new \RuntimeException('Unable to store book cover.');
+                }
 
-            // Kiểm tra dữ liệu giữa hai bảng
-            if (
-                $currentTotal !== (int) $book->total_copies ||
-                $currentAvailable !== (int) $book->available_copies
+                $data['cover_path'] = $newCoverPath;
+            }
+
+            DB::transaction(function () use (
+                $book,
+                $data,
+                $authorIds,
+                &$oldCoverPath
             ) {
-                throw ValidationException::withMessages([
-                    'total_copies' => __('message.books.quantity_out_of_sync'),
+                // Khóa đầu sách trong lúc cập nhật
+                $book = Book::query()
+                    ->lockForUpdate()
+                    ->findOrFail($book->id);
+
+                // Lưu đường dẫn ảnh cũ để xóa sau khi cập nhật thành công
+                $oldCoverPath = $book->cover_path;
+
+                // Lấy số lượng từ book_copies
+                $currentTotal = $book->copies()->count();
+
+                $currentAvailable = $book->copies()
+                    ->where('status', BookCopyStatus::Available->value)
+                    ->count();
+
+                // Kiểm tra dữ liệu giữa hai bảng
+                if (
+                    $currentTotal !== (int) $book->total_copies ||
+                    $currentAvailable !== (int) $book->available_copies
+                ) {
+                    throw ValidationException::withMessages([
+                        'total_copies' => __('message.books.quantity_out_of_sync'),
+                    ]);
+                }
+
+                $newTotal = (int) $data['total_copies'];
+
+                // Chưa cho giảm bản sách
+                if ($newTotal < $currentTotal) {
+                    throw ValidationException::withMessages([
+                        'total_copies' => __('message.books.decrease_copies_not_supported'),
+                    ]);
+                }
+
+                $addedCopies = $newTotal - $currentTotal;
+
+                // Cập nhật đầu sách
+                $book->update([
+                    ...$data,
+                    'available_copies' => $currentAvailable + $addedCopies,
                 ]);
+
+                // Đồng bộ tác giả
+                $book->authors()->sync($authorIds);
+
+                // Tạo thêm bản vật lý nếu tổng số tăng
+                for ($i = $currentTotal + 1; $i <= $newTotal; $i++) {
+                    $book->copies()->create([
+                        'barcode' => sprintf(
+                            'COPY-%06d-%04d',
+                            $book->id,
+                            $i
+                        ),
+                        'status' => BookCopyStatus::Available,
+                    ]);
+                }
+            });
+        } catch (\Throwable $e) {
+            // Cập nhật thất bại thì xóa ảnh mới upload
+            if ($newCoverPath !== null && $newCoverPath !== false) {
+                Storage::disk('public')->delete($newCoverPath);
             }
 
-            $newTotal = (int) $data['total_copies'];
+            throw $e;
+        }
 
-            // Chưa cho giảm bản sách
-            if ($newTotal < $currentTotal) {
-                throw ValidationException::withMessages([
-                    'total_copies' => __('message.books.decrease_copies_not_supported'),
-                ]);
-            }
-
-            $addedCopies = $newTotal - $currentTotal;
-
-            // Cập nhật đầu sách
-            $book->update([
-                ...$data,
-                'available_copies' => $currentAvailable + $addedCopies,
-            ]);
-
-            $book->authors()->sync($authorIds);
-
-            // Tạo thêm bản vật lý nếu tổng số lượng tăng
-            for ($i = $currentTotal + 1; $i <= $newTotal; $i++) {
-                $book->copies()->create([
-                    'barcode' => sprintf('COPY-%06d-%04d', $book->id, $i),
-                    'status' => BookCopyStatus::Available,
-                ]);
-            }
-        });
+        // Chỉ xóa ảnh cũ sau khi Transaction thành công
+        if ($newCoverPath !== null && $oldCoverPath) {
+            Storage::disk('public')->delete($oldCoverPath);
+        }
 
         return redirect()
             ->route('admin.books.index')

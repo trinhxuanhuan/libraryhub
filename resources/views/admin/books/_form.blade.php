@@ -257,4 +257,36 @@
             {{ $message }}
         @enderror
     </div>
+    <div class="mb-3">
+        <label for="cover" class="form-label">
+            Ảnh bìa sách
+        </label>
+
+        <input
+            type="file"
+            id="cover"
+            name="cover"
+            accept=".jpg,.jpeg,.png,.webp"
+            class="form-control @error('cover') is-invalid @enderror"
+        >
+
+        @error('cover')
+            <div class="invalid-feedback">
+                {{ $message }}
+            </div>
+        @enderror
+
+        @if ($book->cover_path)
+            <div class="mt-3">
+                <p class="form-text mb-2">Ảnh bìa hiện tại:</p>
+
+                <img
+                    src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($book->cover_path) }}"
+                    alt="Bìa sách {{ $book->title }}"
+                    class="img-thumbnail"
+                    style="max-width:150px;max-height:180px;object-fit:contain;"
+                >
+            </div>
+        @endif
+    </div>
 </div>

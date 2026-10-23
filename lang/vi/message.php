@@ -42,4 +42,11 @@ return [
     'authorization' => [
         'forbidden' => 'Bạn không có quyền truy cập chức năng này.',
     ],
+    'loans' => [
+        'request_created' => 'Đã gửi yêu cầu mượn sách. Vui lòng chờ thủ thư xác nhận.',
+        'books_unavailable' => 'Một hoặc nhiều đầu sách không còn bản khả dụng. Vui lòng chọn lại.',
+        'selection_added' => 'Đã thêm sách vào danh sách muốn mượn.',
+        'selection_removed' => 'Đã bỏ sách khỏi danh sách muốn mượn.',
+        'selection_empty' => 'Vui lòng chọn ít nhất một cuốn sách.',
+    ],
 ];

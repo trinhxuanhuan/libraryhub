@@ -59,6 +59,7 @@ class StoreBookRequest extends FormRequest
                 'distinct',
                 Rule::exists('authors', 'id'),
             ],
+            'cover' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ];
     }
 }

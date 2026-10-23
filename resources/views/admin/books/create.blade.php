@@ -7,9 +7,8 @@
         <div class="card-body">
             <h1 class="h3 mb-3">Thêm sách</h1>
 
-            <form method="POST" action="{{ route('admin.books.store') }}">
+            <form method="POST" action="{{ route('admin.books.store') }}"  enctype="multipart/form-data">
                 @csrf
-
                 @include('admin.books._form')
 
                 <button type="submit" class="btn btn-primary">

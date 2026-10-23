@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserRole;
 use App\Support\EmailNormalizer;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -56,5 +56,16 @@ class User extends Authenticatable
         return Attribute::make(
             set: fn (string $value): string => EmailNormalizer::normalize($value),
         );
+    }
+
+    public function loans(): HasMany
+    {
+        return $this->hasMany(Loan::class, 'user_id');
+    }
+
+    // Các phiếu mượn do thủ thư xác nhận giao sách
+    public function issuedLoans(): HasMany
+    {
+        return $this->hasMany(Loan::class, 'issued_by');
     }
 }
