@@ -79,41 +79,44 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Kiểm tra các giá trị role hiện tại
         if (DB::table('users')
-            ->whereNotIn('role', [1, 2, 3])
+            ->where(function ($query) {
+                $query->whereNull('role')
+                    ->orWhereNotIn('role', [1, 2, 3]);
+            })
             ->exists()) {
             throw new RuntimeException(
                 'Có role không hợp lệ để rollback.'
             );
         }
 
+        // Tạo cột tạm để lưu role dạng String
         Schema::table('users', function (Blueprint $table) {
             $table->string('role_old', 20)
                 ->default('member');
         });
 
+        // Ánh xạ role từ Integer về String
         $roles = [
             1 => 'admin',
             2 => 'librarian',
             3 => 'member',
         ];
-        // Chuyển đổi dữ liệu từ String sang Integer
-        foreach ($roles as $name => $value) {
-            DB::table('users')
-                ->where('role', $name)
-                ->update(['role_new' => $value]);
-        }
 
+        // Chuyển đổi dữ liệu sang cột role_old
         foreach ($roles as $value => $name) {
             DB::table('users')
                 ->where('role', $value)
                 ->update(['role_old' => $name]);
         }
 
+        // Xóa cột role kiểu Integer
         Schema::table('users', function (Blueprint $table) {
             $table->dropColumn('role');
         });
 
+        // Đổi tên role_old thành role
         Schema::table('users', function (Blueprint $table) {
             $table->renameColumn('role_old', 'role');
         });
