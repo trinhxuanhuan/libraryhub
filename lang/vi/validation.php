@@ -11,6 +11,7 @@ return [
     'exists' => ':attribute không tồn tại.',
     'unique' => ':attribute đã tồn tại.',
     'distinct' => ':attribute không được trùng lặp.',
+    'same' => ':attribute phải trùng với :other.',
 
     'max' => [
         'string' => ':attribute không được quá :max ký tự.',
@@ -41,6 +42,10 @@ return [
         'available_copies' => 'Số bản còn lại',
         'author_ids' => 'Tác giả',
         'author_ids.*' => 'Tác giả được chọn',
+        'password' => 'Mật khẩu',
+        'password_confirmation' => 'Xác nhận mật khẩu',
+        'email' => 'Email',
+        'name' => 'Họ tên',
     ],
 
     // Những thông báo cần diễn đạt riêng

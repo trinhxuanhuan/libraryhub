@@ -9,6 +9,11 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="d-flex flex-column min-vh-100">
+    @php
+        $currentUser = app(\App\Services\ManualAuthenticator::class)
+            ->user(request());
+    @endphp
+
     <nav class="navbar navbar-expand-lg bg-white border-bottom">
         <div class="container">
             <a class="navbar-brand fw-bold" href="{{ route('home') }}">
@@ -28,7 +33,7 @@
             </button>
 
             <div class="collapse navbar-collapse" id="mainMenu">
-                <div class="navbar-nav ms-auto">
+                <div class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
                     <a
                         class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}"
                         href="{{ route('home') }}"
@@ -42,6 +47,67 @@
                     >
                         Giới thiệu
                     </a>
+
+                    @if ($currentUser === null)
+                        <a
+                            class="nav-link {{ request()->routeIs('login') ? 'active' : '' }}"
+                            href="{{ route('login') }}"
+                        >
+                            Đăng nhập
+                        </a>
+
+                        <a
+                            class="btn btn-primary"
+                            href="{{ route('register') }}"
+                        >
+                            Đăng ký
+                        </a>
+                    @else
+                        @if ($currentUser->role === \App\Enums\UserRole::Admin)
+                            <a
+                                class="nav-link"
+                                href="{{ route('admin.books.index') }}"
+                            >
+                                Sách
+                            </a>
+
+                            <a
+                                class="nav-link"
+                                href="{{ route('admin.authors.index') }}"
+                            >
+                                Tác giả
+                            </a>
+
+                            <a
+                                class="nav-link"
+                                href="{{ route('admin.categories.index') }}"
+                            >
+                                Thể loại
+                            </a>
+
+                            <a
+                                class="nav-link"
+                                href="{{ route('admin.users.index') }}"
+                            >
+                                Người dùng
+                            </a>
+                        @endif
+
+                        <span class="navbar-text">
+                            {{ $currentUser->name }}
+                        </span>
+
+                        <form action="{{ route('logout') }}" method="POST">
+                            @csrf
+
+                            <button
+                                type="submit"
+                                class="btn btn-outline-danger"
+                            >
+                                Đăng xuất
+                            </button>
+                        </form>
+                    @endif
                 </div>
             </div>
         </div>
