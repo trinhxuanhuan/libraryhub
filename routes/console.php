@@ -13,12 +13,6 @@ Schedule::command('loans:mark-overdue')
     ->timezone('Asia/Ho_Chi_Minh')
     ->withoutOverlapping();
 
-// Đánh dấu phiếu quá hạn lúc 00:05
-Schedule::command('loans:mark-overdue')
-    ->dailyAt('00:05')
-    ->timezone('Asia/Ho_Chi_Minh')
-    ->withoutOverlapping();
-
 // Gửi email nhắc trả lúc 08:00
 Schedule::command('loans:send-overdue-reminders')
     ->dailyAt('08:00')
