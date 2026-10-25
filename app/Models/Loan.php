@@ -25,6 +25,7 @@ class Loan extends Model
             'due_at' => 'datetime',
             'returned_at' => 'datetime',
             'renewal_count' => 'integer',
+            'overdue_at' => 'datetime',
         ];
     }
 
