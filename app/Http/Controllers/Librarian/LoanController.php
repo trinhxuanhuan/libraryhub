@@ -10,24 +10,92 @@ use App\Models\LoanItem;
 use App\Services\LoanService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class LoanController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $loans = Loan::query()
-            ->with(['user'])
-            ->withCount('items')
-            ->orderByRaw("
-                CASE
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'status' => [
+                'nullable',
+                'in:pending,borrowed,overdue,returned,rejected',
+            ],
+            'from_date' => ['nullable', 'date_format:Y-m-d'],
+            'to_date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $search = trim($filters['search'] ?? '');
+        $status = $filters['status'] ?? '';
+        $fromDate = $filters['from_date'] ?? null;
+        $toDate = $filters['to_date'] ?? null;
+
+        if ($fromDate && $toDate && $fromDate > $toDate) {
+            throw ValidationException::withMessages([
+                'to_date' => 'Ngày kết thúc phải từ ngày bắt đầu trở đi.',
+            ]);
+        }
+
+        $query = Loan::query()
+            ->with([
+                'user',
+                'items.book',
+            ])
+            ->withCount('items');
+
+        // Tìm theo mã phiếu, tên hoặc email thành viên
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('user', function ($userQuery) use ($search) {
+                    $userQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+
+                if (ctype_digit($search)) {
+                    $q->orWhere('loans.id', (int) $search);
+                }
+            });
+        }
+
+        // Lọc theo trạng thái
+        if ($status === 'overdue') {
+            $query->where('status', 'borrowed')
+                ->where('due_at', '<', now());
+        } elseif ($status === 'borrowed') {
+            $query->where('status', 'borrowed')
+                ->where(function ($q) {
+                    $q->whereNull('due_at')
+                        ->orWhere('due_at', '>=', now());
+                });
+        } elseif ($status !== '') {
+            $query->where('status', $status);
+        }
+
+        // Khoảng ngày yêu cầu mượn
+        if ($fromDate) {
+            $query->whereDate('created_at', '>=', $fromDate);
+        }
+
+        if ($toDate) {
+            $query->whereDate('created_at', '<=', $toDate);
+        }
+
+        // Ưu tiên chờ xử lý, tiếp theo là quá hạn
+        $loans = $query
+            ->orderByRaw(
+                "CASE
                     WHEN status = 'pending' THEN 0
-                    WHEN status = 'borrowed' THEN 1
-                    ELSE 2
-                END
-            ")
+                    WHEN status = 'borrowed' AND due_at < ? THEN 1
+                    WHEN status = 'borrowed' THEN 2
+                    ELSE 3
+                END",
+                [now()]
+            )
             ->latest('id')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return view('librarian.loans.index', [
             'loans' => $loans,

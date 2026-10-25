@@ -122,4 +122,16 @@ class LoanController extends Controller
 
         return view('member.books.show', compact('book'));
     }
+
+    public function renew(Request $request, Loan $loan, LoanService $loanService): RedirectResponse
+    {
+        $memberId = (int) $request->session()
+            ->get('manual_auth_user_id');
+
+        $loanService->renewLoan($loan->id, $memberId);
+
+        return redirect()
+            ->route('member.loans.index')
+            ->with('success', 'Gia hạn phiếu mượn thành công.');
+    }
 }

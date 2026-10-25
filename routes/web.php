@@ -92,9 +92,12 @@ Route::middleware([CheckManualAuth::class, 'role:member'])
         // Xác nhận gửi toàn bộ yêu cầu
         Route::post('/selection/submit', [BookSelectionController::class, 'submit'])
             ->name('selection.submit');
+
+        Route::post('/loans/{loan}/renew', [MemberLoanController::class, 'renew'])
+            ->name('loans.renew');
     });
 
-Route::middleware(['manual.auth', 'role:librarian'])
+Route::middleware(['manual.auth', 'role:admin,librarian'])
     ->prefix('librarian')
     ->name('librarian.')
     ->group(function () {

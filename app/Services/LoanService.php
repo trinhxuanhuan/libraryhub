@@ -246,4 +246,54 @@ class LoanService
             }
         });
     }
+
+    public function renewLoan(int $loanId, int $memberId): void
+    {
+        DB::transaction(function () use ($loanId, $memberId) {
+
+            // Khóa phiếu để tránh hai yêu cầu gia hạn cùng lúc
+            $loan = Loan::query()
+                ->where('user_id', $memberId)
+                ->whereKey($loanId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Chỉ gia hạn phiếu đang mượn
+            if ($loan->status !== 'borrowed') {
+                throw ValidationException::withMessages([
+                    'loan' => 'Chỉ được gia hạn phiếu đang mượn.',
+                ]);
+            }
+
+            // Không cho gia hạn khi đã hết hạn
+            if ($loan->due_at === null || $loan->due_at->isPast()) {
+                throw ValidationException::withMessages([
+                    'loan' => 'Phiếu đã quá hạn hoặc không có hạn trả.',
+                ]);
+            }
+
+            // Mỗi phiếu chỉ được gia hạn một lần
+            if ($loan->renewal_count >= 1) {
+                throw ValidationException::withMessages([
+                    'loan' => 'Phiếu đã hết số lần gia hạn.',
+                ]);
+            }
+
+            // Không gia hạn phiếu trống hoặc đã trả một phần
+            if (
+                ! $loan->items()->exists() ||
+                $loan->items()->whereNotNull('returned_at')->exists()
+            ) {
+                throw ValidationException::withMessages([
+                    'loan' => 'Không thể gia hạn phiếu đã trả một phần sách.',
+                ]);
+            }
+
+            // Cộng thêm 7 ngày từ hạn trả hiện tại
+            $loan->update([
+                'due_at' => $loan->due_at->copy()->addDays(7),
+                'renewal_count' => $loan->renewal_count + 1,
+            ]);
+        });
+    }
 }
