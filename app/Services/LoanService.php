@@ -169,40 +169,51 @@ class LoanService
         });
     }
 
-    public function returnItem(int $loanId, int $itemId): void
+    public function returnItem(int $loanId, int $itemId, string $condition = 'normal', ?string $note = null): void
     {
-        DB::transaction(function () use ($loanId, $itemId) {
+        DB::transaction(function () use ($loanId, $itemId, $condition, $note) {
+            // 1. Khóa và kiểm tra phiếu mượn
             $loan = Loan::query()
                 ->lockForUpdate()
                 ->findOrFail($loanId);
 
             if ($loan->status !== 'borrowed') {
                 throw ValidationException::withMessages([
-                    'loan' => 'Phiếu này không ở trạng thái đang mượn.',
+                    'loan' => 'Phiếu không ở trạng thái đang mượn.',
                 ]);
             }
 
-            // Chỉ lấy LoanItem thuộc phiếu đang xử lý
+            // 2. Kiểm tra tình trạng sách được gửi lên
+            if (! in_array($condition, ['normal', 'damaged', 'lost'], true)) {
+                throw ValidationException::withMessages([
+                    'condition' => 'Tình trạng sách không hợp lệ.',
+                ]);
+            }
+
+            // 3. Chỉ lấy LoanItem thuộc phiếu hiện tại
             $item = LoanItem::query()
                 ->where('loan_id', $loan->id)
+                ->whereKey($itemId)
                 ->lockForUpdate()
-                ->findOrFail($itemId);
+                ->firstOrFail();
 
             if (
+                $item->resolved_at !== null ||
                 $item->returned_at !== null ||
                 $item->book_copy_id === null
             ) {
                 throw ValidationException::withMessages([
-                    'loan' => 'Bản sách này đã trả hoặc chưa được giao.',
+                    'loan' => 'Bản sách đã được xử lý hoặc chưa được giao.',
                 ]);
             }
 
-            // Bao gồm cả sách đã bị soft delete nếu có
+            // 4. Khóa đầu sách
             $book = Book::withTrashed()
                 ->whereKey($item->book_id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            // 5. Khóa bản sách vật lý
             $copy = BookCopy::query()
                 ->whereKey($item->book_copy_id)
                 ->where('book_id', $book->id)
@@ -212,36 +223,92 @@ class LoanService
             if (
                 $copy === null ||
                 $copy->getRawOriginal('status')
-                    !== BookCopyStatus::Borrowed->value ||
-                (int) $book->available_copies >= (int) $book->total_copies
+                    !== BookCopyStatus::Borrowed->value
             ) {
                 throw ValidationException::withMessages([
                     'loan' => 'Trạng thái bản sách không hợp lệ.',
                 ]);
             }
 
-            // Bản vật lý trở lại trạng thái có thể mượn
+            // 6. Tính thời điểm xử lý và số ngày quá hạn
+            $resolvedAt = now();
+
+            $daysLate = 0;
+
+            if (
+                $loan->due_at !== null &&
+                $resolvedAt->greaterThan($loan->due_at)
+            ) {
+                // Phần lẻ của một ngày được tính thành một ngày
+                $daysLate = (int) ceil(
+                    $loan->due_at->diffInSeconds($resolvedAt) / 86400
+                );
+            }
+
+            $overdueFine = $daysLate *
+                (int) config('library_loan.overdue_fine_per_day', 0);
+
+            // 7. Xác định tiền bồi thường
+            $compensation = match ($condition) {
+                'damaged' => (int) config(
+                    'library_loan.damaged_compensation',
+                    0
+                ),
+                'lost' => (int) config(
+                    'library_loan.lost_compensation',
+                    0
+                ),
+                default => 0,
+            };
+
+            // 8. Xử lý bản sách theo tình trạng thực tế
+            $copyStatus = match ($condition) {
+                'normal' => BookCopyStatus::Available->value,
+                'damaged' => BookCopyStatus::Damaged->value,
+                'lost' => BookCopyStatus::Lost->value,
+            };
+
+            if ($condition === 'normal') {
+                if (
+                    (int) $book->available_copies >=
+                    (int) $book->total_copies
+                ) {
+                    throw ValidationException::withMessages([
+                        'loan' => 'Số lượng sách khả dụng không hợp lệ.',
+                    ]);
+                }
+            }
+
             $copy->update([
-                'status' => BookCopyStatus::Available->value,
+                'status' => $copyStatus,
             ]);
 
-            // Tăng số lượng sách khả dụng
-            $book->increment('available_copies');
+            // Chỉ sách bình thường mới quay lại kho khả dụng
+            if ($condition === 'normal') {
+                $book->increment('available_copies');
+            }
 
-            // Ghi nhận thời điểm trả của từng đầu sách
+            // 9. Ghi nhận kết quả xử lý LoanItem
             $item->update([
-                'returned_at' => now(),
+                'return_condition' => $condition,
+                'returned_at' => $condition === 'lost'
+                    ? null
+                    : $resolvedAt,
+                'resolved_at' => $resolvedAt,
+                'overdue_fine_amount' => $overdueFine,
+                'compensation_amount' => $compensation,
+                'return_note' => $note,
             ]);
 
-            // Nếu tất cả LoanItem đã trả thì hoàn thành phiếu
-            $hasUnreturnedItems = $loan->items()
-                ->whereNull('returned_at')
+            // 10. Kiểm tra tất cả LoanItems đã xử lý chưa
+            $hasUnresolvedItems = $loan->items()
+                ->whereNull('resolved_at')
                 ->exists();
 
-            if (! $hasUnreturnedItems) {
+            if (! $hasUnresolvedItems) {
                 $loan->update([
                     'status' => 'returned',
-                    'returned_at' => now(),
+                    'returned_at' => $resolvedAt,
                 ]);
             }
         });
@@ -293,6 +360,52 @@ class LoanService
             $loan->update([
                 'due_at' => $loan->due_at->copy()->addDays(7),
                 'renewal_count' => $loan->renewal_count + 1,
+            ]);
+        });
+    }
+
+    public function markFinePaid(int $loanId, int $itemId): void
+    {
+        DB::transaction(function () use ($loanId, $itemId) {
+            // Khóa Loan trước để giữ thứ tự khóa nhất quán
+            $loan = Loan::query()
+                ->lockForUpdate()
+                ->findOrFail($loanId);
+
+            // Chỉ lấy LoanItem thuộc đúng phiếu
+            $item = LoanItem::query()
+                ->where('loan_id', $loan->id)
+                ->whereKey($itemId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Chỉ thu phí sau khi bản sách đã được xử lý
+            if ($item->resolved_at === null) {
+                throw ValidationException::withMessages([
+                    'fine' => 'Bản sách chưa được xử lý trả hoặc mất.',
+                ]);
+            }
+
+            // Tính tổng số tiền phải thanh toán
+            $totalFine = (int) $item->overdue_fine_amount
+                + (int) $item->compensation_amount;
+
+            if ($totalFine <= 0) {
+                throw ValidationException::withMessages([
+                    'fine' => 'Bản sách này không phát sinh phí phạt.',
+                ]);
+            }
+
+            // Không được xác nhận thanh toán hai lần
+            if ($item->fine_paid_at !== null) {
+                throw ValidationException::withMessages([
+                    'fine' => 'Khoản phí này đã được thanh toán.',
+                ]);
+            }
+
+            // Ghi nhận thời điểm Librarian xác nhận đã thu tiền
+            $item->update([
+                'fine_paid_at' => now(),
             ]);
         });
     }

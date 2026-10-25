@@ -12,12 +12,22 @@ class LoanItem extends Model
         'book_id',
         'book_copy_id',
         'returned_at',
+        'return_condition',
+        'resolved_at',
+        'overdue_fine_amount',
+        'compensation_amount',
+        'fine_paid_at',
+        'return_note',
     ];
 
     protected function casts(): array
     {
         return [
             'returned_at' => 'datetime',
+            'resolved_at' => 'datetime',
+            'fine_paid_at' => 'datetime',
+            'overdue_fine_amount' => 'integer',
+            'compensation_amount' => 'integer',
         ];
     }
 

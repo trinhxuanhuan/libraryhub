@@ -117,4 +117,6 @@ Route::middleware(['manual.auth', 'role:admin,librarian'])
             LibrarianLoanController::class,
             'returnItem',
         ])->name('loans.items.return');
+        Route::post('/loans/{loan}/items/{item}/confirm-payment', [LibrarianLoanController::class, 'confirmFinePayment'])
+            ->name('loans.items.confirm-payment');
     });

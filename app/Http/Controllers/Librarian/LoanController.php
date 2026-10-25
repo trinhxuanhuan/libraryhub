@@ -172,15 +172,41 @@ class LoanController extends Controller
     }
 
     // Xác nhận trả một bản sách
-    public function returnItem(
-        Loan $loan,
-        LoanItem $item,
-        LoanService $loanService
-    ): RedirectResponse {
-        $loanService->returnItem($loan->id, $item->id);
+    public function returnItem(Request $request, Loan $loan, LoanItem $item, LoanService $loanService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'condition' => [
+                'sometimes',
+                'in:normal,damaged,lost',
+            ],
+            'note' => [
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+        ]);
+
+        $loanService->returnItem(
+            $loan->id,
+            $item->id,
+            $validated['condition'] ?? 'normal',
+            $validated['note'] ?? null
+        );
 
         return redirect()
             ->route('librarian.loans.show', $loan)
-            ->with('success', 'Đã xác nhận trả sách thành công.');
+            ->with('success', 'Đã ghi nhận xử lý bản sách thành công.');
+    }
+
+    public function confirmFinePayment(Loan $loan, LoanItem $item, LoanService $loanService): RedirectResponse
+    {
+        $loanService->markFinePaid(
+            $loan->id,
+            $item->id
+        );
+
+        return redirect()
+            ->route('librarian.loans.show', $loan)
+            ->with('success', 'Đã xác nhận thu tiền phạt thành công.');
     }
 }

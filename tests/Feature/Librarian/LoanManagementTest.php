@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\Loan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class LoanManagementTest extends TestCase
@@ -590,5 +591,299 @@ class LoanManagementTest extends TestCase
             1,
             (int) $book->fresh()->available_copies
         );
+    }
+
+    private function createBorrowedLoanForReturn(): array
+    {
+        [$book, $copy] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book);
+        $item = $loan->items()->firstOrFail();
+
+        $this->post(route('librarian.loans.issue', $loan), [
+            'copies' => [
+                $item->id => $copy->id,
+            ],
+        ])->assertSessionHasNoErrors();
+
+        return [$loan, $book, $copy, $item];
+    }
+
+    // 1. Trả sách đúng hạn, không phát sinh phí
+    public function test_normal_return_has_no_fine(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('librarian.loans.items.return', [$loan, $item]),
+            ['condition' => 'normal']
+        )->assertSessionHasNoErrors();
+
+        $this->assertSame('returned', $loan->fresh()->status);
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(1, (int) $book->fresh()->available_copies);
+
+        $this->assertNotNull($item->fresh()->returned_at);
+        $this->assertNotNull($item->fresh()->resolved_at);
+
+        $this->assertSame(
+            0,
+            (int) $item->fresh()->overdue_fine_amount
+        );
+
+        $this->assertSame(
+            0,
+            (int) $item->fresh()->compensation_amount
+        );
+    }
+
+    // 2. Trả quá hạn, tính tiền phạt
+    public function test_overdue_return_calculates_fine(): void
+    {
+        $this->travelTo(
+            Carbon::parse('2026-10-25 12:00:00')
+        );
+
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        // Quá hạn 2 ngày và 1 phút: làm tròn thành 3 ngày
+        $loan->update([
+            'due_at' => now()->subDays(2)->subMinute(),
+        ]);
+
+        $this->post(
+            route('librarian.loans.items.return', [$loan, $item]),
+            ['condition' => 'normal']
+        )->assertSessionHasNoErrors();
+
+        $expectedFine = 3 * (int) config(
+            'library_loan.overdue_fine_per_day'
+        );
+
+        $this->assertSame(
+            $expectedFine,
+            (int) $item->fresh()->overdue_fine_amount
+        );
+
+        $this->assertNull($item->fresh()->fine_paid_at);
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(1, (int) $book->fresh()->available_copies);
+    }
+
+    // 3. Sách bị hỏng, không được đưa vào kho khả dụng
+    public function test_damaged_return_does_not_increase_available_copies(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('librarian.loans.items.return', [$loan, $item]),
+            [
+                'condition' => 'damaged',
+                'note' => 'Bìa sách bị rách',
+            ]
+        )->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            BookCopyStatus::Damaged->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(0, (int) $book->fresh()->available_copies);
+
+        $this->assertNotNull($item->fresh()->returned_at);
+        $this->assertNotNull($item->fresh()->resolved_at);
+
+        $this->assertSame(
+            (int) config('library_loan.damaged_compensation'),
+            (int) $item->fresh()->compensation_amount
+        );
+
+        $this->assertSame(
+            'Bìa sách bị rách',
+            $item->fresh()->return_note
+        );
+    }
+
+    // 4. Xác nhận sách mất
+    public function test_lost_book_is_resolved_but_not_returned(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('librarian.loans.items.return', [$loan, $item]),
+            [
+                'condition' => 'lost',
+                'note' => 'Thành viên báo mất sách',
+            ]
+        )->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            BookCopyStatus::Lost->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(0, (int) $book->fresh()->available_copies);
+
+        $this->assertNull($item->fresh()->returned_at);
+        $this->assertNotNull($item->fresh()->resolved_at);
+
+        $this->assertSame(
+            (int) config('library_loan.lost_compensation'),
+            (int) $item->fresh()->compensation_amount
+        );
+
+        // Phiếu đã đóng vì bản sách mất đã được xử lý
+        $this->assertSame('returned', $loan->fresh()->status);
+    }
+
+    // 5. Không được xử lý một bản sách hai lần
+    public function test_resolved_book_cannot_be_processed_twice(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $url = route('librarian.loans.items.return', [$loan, $item]);
+
+        $this->post($url, [
+            'condition' => 'lost',
+        ])->assertSessionHasNoErrors();
+
+        $this->post($url, [
+            'condition' => 'normal',
+        ])->assertSessionHasErrors('loan');
+
+        $this->assertSame(
+            BookCopyStatus::Lost->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(0, (int) $book->fresh()->available_copies);
+        $this->assertSame('returned', $loan->fresh()->status);
+    }
+
+    // 6. Không chấp nhận tình trạng sách không hợp lệ
+    public function test_invalid_return_condition_is_rejected(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('librarian.loans.items.return', [$loan, $item]),
+            ['condition' => 'unknown']
+        )->assertSessionHasErrors('condition');
+
+        $this->assertSame('borrowed', $loan->fresh()->status);
+
+        $this->assertNull($item->fresh()->resolved_at);
+
+        $this->assertSame(
+            BookCopyStatus::Borrowed->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(0, (int) $book->fresh()->available_copies);
+    }
+
+    // Librarian có thể xác nhận thu tiền phạt
+    public function test_librarian_can_confirm_fine_payment(): void
+    {
+        [$loan, , , $item] = $this->createBorrowedLoanForReturn();
+
+        // Trả sách trong tình trạng bị hỏng để phát sinh phí
+        $this->post(
+            route('librarian.loans.items.return', [$loan, $item]),
+            ['condition' => 'damaged']
+        )->assertSessionHasNoErrors();
+
+        $this->assertNull($item->fresh()->fine_paid_at);
+
+        $this->post(
+            route('librarian.loans.items.confirm-payment', [$loan, $item])
+        )
+            ->assertRedirect(route('librarian.loans.show', $loan))
+            ->assertSessionHasNoErrors();
+
+        $this->assertNotNull($item->fresh()->fine_paid_at);
+    }
+
+    // Không thể xác nhận thanh toán hai lần
+    public function test_librarian_cannot_confirm_payment_twice(): void
+    {
+        [$loan, , , $item] = $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('librarian.loans.items.return', [$loan, $item]),
+            ['condition' => 'damaged']
+        )->assertSessionHasNoErrors();
+
+        $url = route(
+            'librarian.loans.items.confirm-payment',
+            [$loan, $item]
+        );
+
+        $this->post($url)->assertSessionHasNoErrors();
+
+        $paidAt = $item->fresh()->fine_paid_at->toDateTimeString();
+
+        $this->post($url)->assertSessionHasErrors('fine');
+
+        $this->assertSame(
+            $paidAt,
+            $item->fresh()->fine_paid_at->toDateTimeString()
+        );
+    }
+
+    // Không được thu tiền khi không phát sinh phí
+    public function test_librarian_cannot_confirm_zero_fine(): void
+    {
+        [$loan, , , $item] = $this->createBorrowedLoanForReturn();
+
+        // Trả sách đúng hạn và bình thường
+        $this->post(
+            route('librarian.loans.items.return', [$loan, $item]),
+            ['condition' => 'normal']
+        )->assertSessionHasNoErrors();
+
+        $this->post(
+            route('librarian.loans.items.confirm-payment', [$loan, $item])
+        )->assertSessionHasErrors('fine');
+
+        $this->assertNull($item->fresh()->fine_paid_at);
+    }
+
+    // Member không được xác nhận thanh toán
+    public function test_member_cannot_confirm_fine_payment(): void
+    {
+        [$loan, , , $item] = $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('librarian.loans.items.return', [$loan, $item]),
+            ['condition' => 'damaged']
+        )->assertSessionHasNoErrors();
+
+        // Chuyển sang Session của Member
+        $this->withSession([
+            'manual_auth_user_id' => $this->member->id,
+        ]);
+
+        $this->post(
+            route('librarian.loans.items.confirm-payment', [$loan, $item])
+        )->assertForbidden();
+
+        $this->assertNull($item->fresh()->fine_paid_at);
     }
 }
