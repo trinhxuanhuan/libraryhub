@@ -30,7 +30,7 @@
                     Phiếu mượn #{{ $loan->id }}
                 </h1>
 
-                <a href="{{ route('librarian.loans.index') }}"
+                <a href="{{ route('management.loans.index') }}"
                    class="btn btn-outline-secondary">
                     Quay lại
                 </a>
@@ -313,7 +313,7 @@
                                         $item->book_copy_id !== null
                                     )
                                         <form
-                                            action="{{ route('librarian.loans.items.return', [$loan, $item]) }}"
+                                            action="{{ route('management.loans.items.return', [$loan, $item]) }}"
                                             method="POST"
                                             onsubmit="return confirm('Xác nhận xử lý bản sách này?')"
                                         >
@@ -435,7 +435,7 @@
 
                                 <form
                                     method="POST"
-                                    action="{{ route('librarian.loans.items.confirm-payment', [$loan, $item]) }}"
+                                    action="{{ route('management.loans.items.confirm-payment', [$loan, $item]) }}"
                                     class="mt-2"
                                     onsubmit="return confirm('Bạn xác nhận đã nhận đủ {{ number_format($itemTotalFine, 0, ',', '.') }} đ?')"
                                 >
@@ -462,7 +462,7 @@
 
                     <form
                         id="issue-loan-form"
-                        action="{{ route('librarian.loans.issue', $loan) }}"
+                        action="{{ route('management.loans.issue', $loan) }}"
                         method="POST"
                     >
                         @csrf
@@ -476,7 +476,7 @@
                     </form>
 
                     <form
-                        action="{{ route('librarian.loans.reject', $loan) }}"
+                        action="{{ route('management.loans.reject', $loan) }}"
                         method="POST"
                         onsubmit="return confirm('Bạn chắc chắn muốn từ chối phiếu này?')"
                     >

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Librarian;
+namespace App\Http\Controllers\Management;
 
 use App\Enums\BookCopyStatus;
 use App\Enums\UserRole;
@@ -101,7 +101,7 @@ class LoanController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('librarian.loans.index', [
+        return view('management.loans.index', [
             'loans' => $loans,
         ]);
     }
@@ -127,7 +127,7 @@ class LoanController extends Controller
                 ->groupBy('book_id');
         }
 
-        return view('librarian.loans.show', [
+        return view('management.loans.show', [
             'loan' => $loan,
             'availableCopiesByBook' => $availableCopiesByBook,
         ]);
@@ -159,7 +159,7 @@ class LoanController extends Controller
         );
 
         return redirect()
-            ->route('librarian.loans.show', $loan)
+            ->route('management.loans.show', $loan)
             ->with('success', 'Đã duyệt và giao sách thành công.');
     }
 
@@ -171,7 +171,7 @@ class LoanController extends Controller
         $loanService->rejectLoan($loan->id);
 
         return redirect()
-            ->route('librarian.loans.show', $loan)
+            ->route('management.loans.show', $loan)
             ->with('success', 'Đã từ chối yêu cầu mượn sách.');
     }
 
@@ -198,7 +198,7 @@ class LoanController extends Controller
         );
 
         return redirect()
-            ->route('librarian.loans.show', $loan)
+            ->route('management.loans.show', $loan)
             ->with('success', 'Đã ghi nhận xử lý bản sách thành công.');
     }
 
@@ -210,7 +210,7 @@ class LoanController extends Controller
         );
 
         return redirect()
-            ->route('librarian.loans.show', $loan)
+            ->route('management.loans.show', $loan)
             ->with('success', 'Đã xác nhận thu tiền phạt thành công.');
     }
 
@@ -235,7 +235,7 @@ class LoanController extends Controller
             ->orderBy('title')
             ->get(['id', 'title', 'available_copies']);
 
-        return view('librarian.loans.create', compact(
+        return view('management.loans.create', compact(
             'members',
             'books'
         ));
@@ -272,7 +272,7 @@ class LoanController extends Controller
         );
 
         return redirect()
-            ->route('librarian.loans.show', $loan)
+            ->route('management.loans.show', $loan)
             ->with(
                 'success',
                 'Đã tạo phiếu mượn. Hãy chọn bản sách để giao.'

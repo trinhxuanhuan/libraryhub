@@ -16,7 +16,7 @@
             </div>
 
             {{-- Nút tạo phiếu mượn --}}
-            <a href="{{ route('librarian.loans.create') }}"
+            <a href="{{ route('management.loans.create') }}"
                class="btn btn-primary">
                 + Tạo phiếu mượn
             </a>
@@ -32,7 +32,7 @@
         @endif
         {{-- Bộ lọc phiếu mượn --}}
         <form method="GET"
-              action="{{ route('librarian.loans.index') }}"
+              action="{{ route('management.loans.index') }}"
               class="border rounded p-3 mb-4 bg-light">
 
             <div class="row g-3 align-items-end">
@@ -127,7 +127,7 @@
             </div>
 
             <div class="mt-3">
-                <a href="{{ route('librarian.loans.index') }}"
+                <a href="{{ route('management.loans.index') }}"
                    class="btn btn-sm btn-outline-secondary">
                     Xóa bộ lọc
                 </a>
@@ -243,7 +243,7 @@
                             </td>
 
                             <td class="text-nowrap">
-                                <a href="{{ route('librarian.loans.show', $loan) }}"
+                                <a href="{{ route('management.loans.show', $loan) }}"
                                    class="btn btn-sm btn-outline-primary">
 
                                     @if ($loan->status === 'pending')

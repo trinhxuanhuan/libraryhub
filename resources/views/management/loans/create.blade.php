@@ -11,7 +11,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h3 mb-0">Tạo phiếu mượn</h1>
 
-                <a href="{{ route('librarian.loans.index') }}"
+                <a href="{{ route('management.loans.index') }}"
                    class="btn btn-outline-secondary">
                     Quay lại
                 </a>
@@ -28,7 +28,7 @@
             @endif
 
             <form method="POST"
-                  action="{{ route('librarian.loans.store') }}">
+                  action="{{ route('management.loans.store') }}">
                 @csrf
 
                 <div class="mb-4">

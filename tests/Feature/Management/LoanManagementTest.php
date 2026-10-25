@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\Librarian;
+namespace Tests\Feature\Management;
 
 use App\Enums\BookCopyStatus;
 use App\Enums\UserRole;
@@ -91,10 +91,10 @@ class LoanManagementTest extends TestCase
 
         $loan = $this->createPendingLoan($book);
 
-        $this->get(route('librarian.loans.index'))
+        $this->get(route('management.loans.index'))
             ->assertOk();
 
-        $this->get(route('librarian.loans.show', $loan))
+        $this->get(route('management.loans.show', $loan))
             ->assertOk()
             ->assertSeeText($book->title)
             ->assertSeeText($this->member->name);
@@ -110,7 +110,7 @@ class LoanManagementTest extends TestCase
         $items = $loan->items()->orderBy('id')->get();
 
         $this->post(
-            route('librarian.loans.issue', $loan),
+            route('management.loans.issue', $loan),
             [
                 'copies' => [
                     $items[0]->id => $copy1->id,
@@ -118,7 +118,7 @@ class LoanManagementTest extends TestCase
                 ],
             ]
         )
-            ->assertRedirect(route('librarian.loans.show', $loan))
+            ->assertRedirect(route('management.loans.show', $loan))
             ->assertSessionHasNoErrors();
 
         $loan->refresh();
@@ -169,8 +169,8 @@ class LoanManagementTest extends TestCase
 
         $loan = $this->createPendingLoan($book);
 
-        $this->post(route('librarian.loans.reject', $loan))
-            ->assertRedirect(route('librarian.loans.show', $loan))
+        $this->post(route('management.loans.reject', $loan))
+            ->assertRedirect(route('management.loans.show', $loan))
             ->assertSessionHasNoErrors();
 
         $this->assertSame('rejected', $loan->fresh()->status);
@@ -196,7 +196,7 @@ class LoanManagementTest extends TestCase
         $items = $loan->items()->orderBy('id')->get();
 
         $this->post(
-            route('librarian.loans.issue', $loan),
+            route('management.loans.issue', $loan),
             [
                 'copies' => [
                     $items[0]->id => $copy1->id,
@@ -207,7 +207,7 @@ class LoanManagementTest extends TestCase
 
         // Trả bản sách thứ nhất
         $this->post(route(
-            'librarian.loans.items.return',
+            'management.loans.items.return',
             [$loan, $items[0]]
         ))->assertSessionHasNoErrors();
 
@@ -229,7 +229,7 @@ class LoanManagementTest extends TestCase
 
         // Trả bản sách thứ hai
         $this->post(route(
-            'librarian.loans.items.return',
+            'management.loans.items.return',
             [$loan, $items[1]]
         ))->assertSessionHasNoErrors();
 
@@ -267,11 +267,11 @@ class LoanManagementTest extends TestCase
         ];
 
         // Lần giao thứ nhất thành công
-        $this->post(route('librarian.loans.issue', $loan), $data)
+        $this->post(route('management.loans.issue', $loan), $data)
             ->assertSessionHasNoErrors();
 
         // Không được giao lại phiếu đang borrowed
-        $this->post(route('librarian.loans.issue', $loan), $data)
+        $this->post(route('management.loans.issue', $loan), $data)
             ->assertSessionHasErrors('loan');
 
         $this->assertSame('borrowed', $loan->fresh()->status);
@@ -292,7 +292,7 @@ class LoanManagementTest extends TestCase
 
         // Cố giao bản vật lý của Book 2 cho Book 1
         $this->post(
-            route('librarian.loans.issue', $loan),
+            route('management.loans.issue', $loan),
             [
                 'copies' => [
                     $item->id => $copy2->id,
@@ -323,7 +323,7 @@ class LoanManagementTest extends TestCase
         $item = $loan->items()->firstOrFail();
 
         $this->post(
-            route('librarian.loans.issue', $loan),
+            route('management.loans.issue', $loan),
             [
                 'copies' => [
                     $item->id => $copy->id,
@@ -333,13 +333,13 @@ class LoanManagementTest extends TestCase
 
         // Lần trả thứ nhất
         $this->post(route(
-            'librarian.loans.items.return',
+            'management.loans.items.return',
             [$loan, $item]
         ))->assertSessionHasNoErrors();
 
         // Lần trả thứ hai phải bị từ chối
         $this->post(route(
-            'librarian.loans.items.return',
+            'management.loans.items.return',
             [$loan, $item]
         ))->assertSessionHasErrors('loan');
 
@@ -358,7 +358,7 @@ class LoanManagementTest extends TestCase
             'manual_auth_user_id' => $this->member->id,
         ]);
 
-        $this->get(route('librarian.loans.index'))
+        $this->get(route('management.loans.index'))
             ->assertForbidden();
     }
 
@@ -386,7 +386,7 @@ class LoanManagementTest extends TestCase
 
         // Librarian cố giao cả hai bản sách
         $this->post(
-            route('librarian.loans.issue', $loan),
+            route('management.loans.issue', $loan),
             [
                 'copies' => [
                     $items[0]->id => $copy1->id,
@@ -448,7 +448,7 @@ class LoanManagementTest extends TestCase
             'book_copy_id' => null,
         ]);
 
-        $this->get(route('librarian.loans.index', [
+        $this->get(route('management.loans.index', [
             'search' => $this->member->email,
         ]))
             ->assertOk()
@@ -474,7 +474,7 @@ class LoanManagementTest extends TestCase
             'due_at' => now()->addDays(7),
         ]);
 
-        $this->get(route('librarian.loans.index', [
+        $this->get(route('management.loans.index', [
             'status' => 'overdue',
         ]))
             ->assertOk()
@@ -494,7 +494,7 @@ class LoanManagementTest extends TestCase
             'created_at' => now()->subDays(10),
         ])->saveQuietly();
 
-        $this->get(route('librarian.loans.index', [
+        $this->get(route('management.loans.index', [
             'from_date' => now()->subDays(2)->toDateString(),
             'to_date' => now()->toDateString(),
         ]))
@@ -505,7 +505,7 @@ class LoanManagementTest extends TestCase
 
     public function test_librarian_cannot_filter_with_invalid_date_range(): void
     {
-        $this->get(route('librarian.loans.index', [
+        $this->get(route('management.loans.index', [
             'from_date' => '2026-10-25',
             'to_date' => '2026-10-20',
         ]))
@@ -534,23 +534,23 @@ class LoanManagementTest extends TestCase
         $item = $loan->items()->firstOrFail();
 
         // Admin được truy cập danh sách
-        $this->get(route('librarian.loans.index'))
+        $this->get(route('management.loans.index'))
             ->assertOk();
 
         // Admin được xem chi tiết
-        $this->get(route('librarian.loans.show', $loan))
+        $this->get(route('management.loans.show', $loan))
             ->assertOk();
 
         // Admin được duyệt và giao sách
         $this->post(
-            route('librarian.loans.issue', $loan),
+            route('management.loans.issue', $loan),
             [
                 'copies' => [
                     $item->id => $copy->id,
                 ],
             ]
         )
-            ->assertRedirect(route('librarian.loans.show', $loan))
+            ->assertRedirect(route('management.loans.show', $loan))
             ->assertSessionHasNoErrors();
 
         $this->assertSame('borrowed', $loan->fresh()->status);
@@ -575,7 +575,7 @@ class LoanManagementTest extends TestCase
         ]);
 
         $this->post(
-            route('librarian.loans.issue', $loan),
+            route('management.loans.issue', $loan),
             [
                 'copies' => [
                     $item->id => $copy->id,
@@ -600,7 +600,7 @@ class LoanManagementTest extends TestCase
         $loan = $this->createPendingLoan($book);
         $item = $loan->items()->firstOrFail();
 
-        $this->post(route('librarian.loans.issue', $loan), [
+        $this->post(route('management.loans.issue', $loan), [
             'copies' => [
                 $item->id => $copy->id,
             ],
@@ -616,7 +616,7 @@ class LoanManagementTest extends TestCase
             $this->createBorrowedLoanForReturn();
 
         $this->post(
-            route('librarian.loans.items.return', [$loan, $item]),
+            route('management.loans.items.return', [$loan, $item]),
             ['condition' => 'normal']
         )->assertSessionHasNoErrors();
 
@@ -659,7 +659,7 @@ class LoanManagementTest extends TestCase
         ]);
 
         $this->post(
-            route('librarian.loans.items.return', [$loan, $item]),
+            route('management.loans.items.return', [$loan, $item]),
             ['condition' => 'normal']
         )->assertSessionHasNoErrors();
 
@@ -689,7 +689,7 @@ class LoanManagementTest extends TestCase
             $this->createBorrowedLoanForReturn();
 
         $this->post(
-            route('librarian.loans.items.return', [$loan, $item]),
+            route('management.loans.items.return', [$loan, $item]),
             [
                 'condition' => 'damaged',
                 'note' => 'Bìa sách bị rách',
@@ -724,7 +724,7 @@ class LoanManagementTest extends TestCase
             $this->createBorrowedLoanForReturn();
 
         $this->post(
-            route('librarian.loans.items.return', [$loan, $item]),
+            route('management.loans.items.return', [$loan, $item]),
             [
                 'condition' => 'lost',
                 'note' => 'Thành viên báo mất sách',
@@ -756,7 +756,7 @@ class LoanManagementTest extends TestCase
         [$loan, $book, $copy, $item] =
             $this->createBorrowedLoanForReturn();
 
-        $url = route('librarian.loans.items.return', [$loan, $item]);
+        $url = route('management.loans.items.return', [$loan, $item]);
 
         $this->post($url, [
             'condition' => 'lost',
@@ -782,7 +782,7 @@ class LoanManagementTest extends TestCase
             $this->createBorrowedLoanForReturn();
 
         $this->post(
-            route('librarian.loans.items.return', [$loan, $item]),
+            route('management.loans.items.return', [$loan, $item]),
             ['condition' => 'unknown']
         )->assertSessionHasErrors('condition');
 
@@ -805,16 +805,16 @@ class LoanManagementTest extends TestCase
 
         // Trả sách trong tình trạng bị hỏng để phát sinh phí
         $this->post(
-            route('librarian.loans.items.return', [$loan, $item]),
+            route('management.loans.items.return', [$loan, $item]),
             ['condition' => 'damaged']
         )->assertSessionHasNoErrors();
 
         $this->assertNull($item->fresh()->fine_paid_at);
 
         $this->post(
-            route('librarian.loans.items.confirm-payment', [$loan, $item])
+            route('management.loans.items.confirm-payment', [$loan, $item])
         )
-            ->assertRedirect(route('librarian.loans.show', $loan))
+            ->assertRedirect(route('management.loans.show', $loan))
             ->assertSessionHasNoErrors();
 
         $this->assertNotNull($item->fresh()->fine_paid_at);
@@ -826,12 +826,12 @@ class LoanManagementTest extends TestCase
         [$loan, , , $item] = $this->createBorrowedLoanForReturn();
 
         $this->post(
-            route('librarian.loans.items.return', [$loan, $item]),
+            route('management.loans.items.return', [$loan, $item]),
             ['condition' => 'damaged']
         )->assertSessionHasNoErrors();
 
         $url = route(
-            'librarian.loans.items.confirm-payment',
+            'management.loans.items.confirm-payment',
             [$loan, $item]
         );
 
@@ -854,12 +854,12 @@ class LoanManagementTest extends TestCase
 
         // Trả sách đúng hạn và bình thường
         $this->post(
-            route('librarian.loans.items.return', [$loan, $item]),
+            route('management.loans.items.return', [$loan, $item]),
             ['condition' => 'normal']
         )->assertSessionHasNoErrors();
 
         $this->post(
-            route('librarian.loans.items.confirm-payment', [$loan, $item])
+            route('management.loans.items.confirm-payment', [$loan, $item])
         )->assertSessionHasErrors('fine');
 
         $this->assertNull($item->fresh()->fine_paid_at);
@@ -871,7 +871,7 @@ class LoanManagementTest extends TestCase
         [$loan, , , $item] = $this->createBorrowedLoanForReturn();
 
         $this->post(
-            route('librarian.loans.items.return', [$loan, $item]),
+            route('management.loans.items.return', [$loan, $item]),
             ['condition' => 'damaged']
         )->assertSessionHasNoErrors();
 
@@ -881,7 +881,7 @@ class LoanManagementTest extends TestCase
         ]);
 
         $this->post(
-            route('librarian.loans.items.confirm-payment', [$loan, $item])
+            route('management.loans.items.confirm-payment', [$loan, $item])
         )->assertForbidden();
 
         $this->assertNull($item->fresh()->fine_paid_at);
@@ -891,7 +891,7 @@ class LoanManagementTest extends TestCase
     {
         [$book] = $this->createBookWithCopy();
 
-        $this->get(route('librarian.loans.create'))
+        $this->get(route('management.loans.create'))
             ->assertOk()
             ->assertSeeText($this->member->name)
             ->assertSeeText($book->title);
@@ -903,7 +903,7 @@ class LoanManagementTest extends TestCase
         [$book2, $copy2] = $this->createBookWithCopy();
 
         $response = $this->post(
-            route('librarian.loans.store'),
+            route('management.loans.store'),
             [
                 'member_id' => $this->member->id,
                 'book_ids' => [
@@ -921,7 +921,7 @@ class LoanManagementTest extends TestCase
             ->firstOrFail();
 
         $response->assertRedirect(
-            route('librarian.loans.show', $loan)
+            route('management.loans.show', $loan)
         );
 
         $this->assertSame('pending', $loan->status);
@@ -958,7 +958,7 @@ class LoanManagementTest extends TestCase
         [$book] = $this->createBookWithCopy();
 
         $this->post(
-            route('librarian.loans.store'),
+            route('management.loans.store'),
             [
                 'member_id' => $this->librarian->id,
                 'book_ids' => [$book->id],
@@ -980,7 +980,7 @@ class LoanManagementTest extends TestCase
         ])->save();
 
         $this->post(
-            route('librarian.loans.store'),
+            route('management.loans.store'),
             [
                 'member_id' => $inactiveMember->id,
                 'book_ids' => [$book->id],
@@ -995,7 +995,7 @@ class LoanManagementTest extends TestCase
         [$book] = $this->createBookWithCopy();
 
         $this->post(
-            route('librarian.loans.store'),
+            route('management.loans.store'),
             [
                 'member_id' => $this->member->id,
                 'book_ids' => [
@@ -1021,7 +1021,7 @@ class LoanManagementTest extends TestCase
         ]);
 
         $this->post(
-            route('librarian.loans.store'),
+            route('management.loans.store'),
             [
                 'member_id' => $this->member->id,
                 'book_ids' => [$book->id],
@@ -1039,11 +1039,11 @@ class LoanManagementTest extends TestCase
 
         [$book] = $this->createBookWithCopy();
 
-        $this->get(route('librarian.loans.create'))
+        $this->get(route('management.loans.create'))
             ->assertForbidden();
 
         $this->post(
-            route('librarian.loans.store'),
+            route('management.loans.store'),
             [
                 'member_id' => $this->member->id,
                 'book_ids' => [$book->id],
