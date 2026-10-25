@@ -1,0 +1,376 @@
+/* Các trang công khai và xác thực của LibraryHub.
+   Mọi selector được đặt tiền tố lh- để không ảnh hưởng trang quản lý. */
+
+.lh-heading-tight {
+    letter-spacing: -0.035em;
+    line-height: 1.14;
+}
+
+.lh-eyebrow {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+}
+
+.lh-eyebrow-light {
+    color: #bfdbfe;
+}
+
+.lh-hero {
+    position: relative;
+    color: #fff;
+    background:
+        radial-gradient(circle at 92% 9%, rgba(125, 211, 252, 0.36), transparent 32%),
+        linear-gradient(118deg, #0b2c60 0%, #1554ac 59%, #0d6efd 100%);
+}
+
+.lh-hero::before {
+    content: '';
+    position: absolute;
+    width: 360px;
+    height: 360px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 50%;
+    right: -110px;
+    top: -135px;
+    pointer-events: none;
+}
+
+.lh-hero-content {
+    z-index: 1;
+}
+
+.lh-hero-description {
+    max-width: 560px;
+    color: #dce9ff;
+    font-size: 1.075rem;
+    line-height: 1.8;
+}
+
+.lh-book-scene {
+    position: relative;
+    min-height: 315px;
+    perspective: 800px;
+}
+
+.lh-book {
+    position: absolute;
+    top: 31px;
+    width: 135px;
+    height: 224px;
+    border-radius: 7px 14px 14px 7px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 26px 16px;
+    color: #fff;
+    box-shadow: 8px 18px 32px rgba(5, 22, 52, 0.3), inset 8px 0 0 rgba(0, 0, 0, 0.12);
+    transition: transform 180ms ease;
+}
+
+.lh-book span {
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    opacity: 0.9;
+}
+
+.lh-book strong {
+    font-size: 1.35rem;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+}
+
+.lh-book-one {
+    left: 7%;
+    background: linear-gradient(160deg, #da5784, #8f286a);
+    transform: rotate(-12deg) translateY(15px);
+}
+
+.lh-book-two {
+    left: 33%;
+    z-index: 1;
+    background: linear-gradient(160deg, #2dafe0, #1657a5);
+    transform: rotate(-1deg) translateY(-5px);
+}
+
+.lh-book-three {
+    left: 60%;
+    background: linear-gradient(160deg, #efa64b, #c85b35);
+    transform: rotate(10deg) translateY(12px);
+}
+
+.lh-book-shelf {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 29px;
+    height: 11px;
+    border-radius: 50%;
+    background: rgba(0, 19, 55, 0.2);
+    filter: blur(10px);
+}
+
+.lh-search-input {
+    min-width: 0;
+}
+
+.lh-feature-card {
+    transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.lh-feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0.75rem 1.5rem rgba(31, 58, 102, 0.12) !important;
+}
+
+.lh-feature-icon {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 55px;
+    height: 55px;
+    border-radius: 17px;
+    font-weight: 800;
+    font-size: 1.1rem;
+}
+
+.lh-feature-blue {
+    color: #1759c5;
+    background: #e9f1ff;
+}
+
+.lh-feature-teal {
+    color: #087f77;
+    background: #dff8f3;
+}
+
+.lh-feature-orange {
+    color: #b35712;
+    background: #fff0dc;
+}
+
+.lh-surface {
+    background: #f0f5ff;
+    border-color: #e0eafc !important;
+}
+
+.lh-step-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 43px;
+    height: 43px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #c9dcfd;
+    color: #155dbd;
+    font-weight: 800;
+}
+
+.lh-about-hero {
+    background:
+        radial-gradient(circle at 95% 6%, rgba(191, 219, 254, 0.5), transparent 34%),
+        linear-gradient(135deg, #fff, #edf4ff);
+    border: 1px solid #dfeafd;
+}
+
+.lh-about-hero .lead {
+    max-width: 660px;
+    line-height: 1.8;
+}
+
+.lh-about-art {
+    position: relative;
+    min-height: 250px;
+}
+
+.lh-about-art-circle {
+    position: absolute;
+    width: 245px;
+    height: 245px;
+    border-radius: 50%;
+    background: #dce9ff;
+    left: 50%;
+    top: 3px;
+    transform: translateX(-50%);
+}
+
+.lh-about-art-book {
+    position: absolute;
+    bottom: 27px;
+    width: 57px;
+    height: 158px;
+    border-radius: 6px 10px 10px 6px;
+    box-shadow: 7px 10px 15px rgba(8, 37, 93, 0.15), inset 6px 0 0 rgba(0, 0, 0, 0.1);
+}
+
+.lh-about-art-book-first {
+    left: 28%;
+    background: #1a73cf;
+    transform: rotate(-12deg);
+}
+
+.lh-about-art-book-second {
+    left: 45%;
+    height: 185px;
+    background: #f0a441;
+    transform: rotate(2deg);
+}
+
+.lh-about-art-book-third {
+    left: 63%;
+    background: #35a89f;
+    transform: rotate(14deg);
+}
+
+.lh-process-list {
+    padding: 0;
+    list-style: none;
+}
+
+.lh-process-item {
+    position: relative;
+    display: flex;
+    gap: 16px;
+    padding-bottom: 24px;
+}
+
+.lh-process-item:last-child {
+    padding-bottom: 0;
+}
+
+.lh-process-item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 41px;
+    bottom: 0;
+    border-left: 2px dashed #c8d9f6;
+}
+
+.lh-process-index {
+    position: relative;
+    z-index: 1;
+    flex: 0 0 42px;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #eaf2ff;
+    color: #165eb7;
+    font-weight: 800;
+}
+
+.lh-cta-strip {
+    background: #eef5ff;
+    border: 1px solid #ddeafb;
+}
+
+.lh-auth-wrap {
+    max-width: 1050px;
+    margin-inline: auto;
+}
+
+.lh-auth-card {
+    border-radius: 22px !important;
+}
+
+.lh-auth-aside {
+    position: relative;
+    isolation: isolate;
+    min-height: 100%;
+    overflow: hidden;
+    color: #fff;
+    background:
+        radial-gradient(circle at 110% 0%, rgba(125, 211, 252, 0.3), transparent 52%),
+        linear-gradient(160deg, #0b2e62, #175cb7 85%, #0d6efd);
+}
+
+.lh-auth-aside::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    right: -125px;
+    bottom: 65px;
+    width: 300px;
+    height: 300px;
+    border: 44px solid rgba(255, 255, 255, 0.075);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.lh-auth-aside-description {
+    max-width: 340px;
+    color: #deebff;
+    line-height: 1.8;
+}
+
+.lh-auth-quote {
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.lh-auth-quote .small {
+    color: #dce9ff;
+}
+
+.lh-auth-form {
+    max-width: 620px;
+    margin-inline: auto;
+}
+
+.lh-auth-form .form-control {
+    border-color: #dbe3ef;
+    font-size: 1rem;
+}
+
+.lh-auth-form .form-control:focus {
+    border-color: #8db7ff;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.12);
+}
+
+.lh-password-toggle {
+    border-color: #dbe3ef;
+}
+
+@media (min-width: 992px) {
+    .lh-auth-aside {
+        min-height: 590px;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .lh-auth-aside {
+        min-height: 250px;
+    }
+
+    .lh-auth-quote {
+        display: none;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .lh-hero .display-5 {
+        font-size: 2.1rem;
+    }
+
+    .lh-auth-card {
+        border-radius: 15px !important;
+    }
+
+    .lh-auth-aside {
+        min-height: 225px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lh-feature-card,
+    .lh-book {
+        transition: none;
+    }
+}

@@ -1,5 +1,174 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
-
+@import './libraryhub-pages.css';
 body {
     background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    color: #1e40af;
+    letter-spacing: -0.025em;
+}
+
+.navbar-brand:hover {
+    color: #1d4ed8;
+}
+
+/* LibraryHub Logo */
+.libraryhub-brand-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 38px;
+    height: 38px;
+
+    border-radius: 10px;
+    background-color: #2563eb;
+
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+/* Navigation Links */
+.navbar .nav-link {
+    border-radius: 0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
+}
+
+/* Hover State */
+.navbar .nav-link:hover {
+    background-color: #f1f5f9;
+}
+
+/* Active State */
+.navbar .nav-link.active {
+    color: #1d4ed8;
+    background-color: #eff6ff;
+    font-weight: 600;
+}
+
+.flash-toast-container {
+    z-index: 1090;
+}
+
+.flash-toast-container .toast {
+    max-width: calc(100vw - 2rem);
+}
+
+.libraryhub-topbar {
+    background: linear-gradient(120deg, #1554d1, #2563eb);
+}
+
+.libraryhub-topbar .navbar-brand,
+.libraryhub-topbar .navbar-brand:hover {
+    color: #fff;
+}
+
+.libraryhub-topbar .libraryhub-brand-mark {
+    background-color: rgb(255 255 255 / 18%);
+    color: #fff;
+}
+
+.libraryhub-topbar .nav-link {
+    color: rgb(255 255 255 / 85%);
+}
+
+.libraryhub-topbar .nav-link:hover {
+    color: #fff;
+    background-color: rgb(255 255 255 / 12%);
+}
+
+.libraryhub-topbar .nav-link.active {
+    color: #fff;
+    background-color: rgb(255 255 255 / 20%);
+}
+
+.management-sidebar {
+    background-color: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow: 0 2px 12px rgb(15 23 42 / 5%);
+}
+
+.management-sidebar-header {
+    padding: 0.5rem 0.75rem 1rem;
+}
+
+.management-sidebar-nav {
+    overflow-x: auto;
+}
+
+.management-sidebar .nav-link {
+    color: #475569;
+    font-weight: 500;
+    border-radius: 0.65rem;
+    padding: 0.8rem 1rem;
+    white-space: nowrap;
+
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
+}
+
+.management-sidebar .nav-link:hover {
+    color: #1d4ed8;
+    background-color: #eff6ff;
+}
+
+.management-sidebar .nav-link.active {
+    color: #fff;
+    background-color: #2563eb;
+    font-weight: 600;
+}
+
+.management-content {
+    min-width: 0;
+}
+
+
+.dashboard-page .card {
+    border-radius: 1rem;
+    box-shadow: 0 2px 12px rgb(15 23 42 / 5%);
+}
+
+.dashboard-page .card-header {
+    padding: 1rem 1.25rem;
+}
+
+.dashboard-page h1 {
+    font-weight: 700;
+    color: #1e293b;
+}
+
+@media (min-width: 992px) {
+    .management-sidebar {
+        position: sticky;
+        top: 6rem;
+    }
+
+    .management-sidebar-nav {
+        overflow-x: visible;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .management-sidebar-header {
+        display: none;
+    }
+
+    .management-sidebar {
+        padding: 0.5rem;
+    }
+
+    .management-sidebar .nav-link {
+        padding: 0.65rem 0.85rem;
+    }
 }

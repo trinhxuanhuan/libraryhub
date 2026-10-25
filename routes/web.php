@@ -22,25 +22,31 @@ Route::get('/', [HomeController::class, 'index'])
 Route::get('/about', [AboutController::class, 'index'])
     ->name('about');
 
-// Admin Routes
-Route::middleware(['manual.auth', 'role:admin'])
+Route::get('/books', [MemberLoanController::class, 'index'])
+    ->name('books.index');
+
+Route::get('/books/{book}', [MemberLoanController::class, 'show'])
+    ->name('books.show');
+
+// Book, Author, Category Management - Admin & Librarian
+Route::middleware(['manual.auth', 'role:admin,librarian'])
     ->group(function () {
-        // Quản lý thể loại
         Route::resource('admin/categories', CategoryController::class)
             ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
             ->names('admin.categories');
 
-        // Quản lý tác giả
         Route::resource('admin/authors', AuthorController::class)
             ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
             ->names('admin.authors');
 
-        // Quản lý sách
         Route::resource('admin/books', BookController::class)
             ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
             ->names('admin.books');
+    });
 
-        // Quản lý người dùng
+// User Management - Admin Only
+Route::middleware(['manual.auth', 'role:admin'])
+    ->group(function () {
         Route::get('admin/users', [UserController::class, 'index'])
             ->name('admin.users.index');
 

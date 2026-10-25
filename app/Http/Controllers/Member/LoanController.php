@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Member;
-
+use App\Services\ManualAuthenticator;
 use App\Enums\BookCopyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreLoanRequest;
@@ -16,7 +16,7 @@ use Illuminate\View\View;
 
 class LoanController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, ManualAuthenticator $authenticator): View
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:150'],
@@ -75,7 +75,8 @@ class LoanController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('member.books.index', compact('books', 'categories'));
+        $viewer = $authenticator->user($request);
+        return view('member.books.index', compact('books', 'categories', 'viewer'));
     }
 
     // Xử lý yêu cầu mượn sách
@@ -107,8 +108,7 @@ class LoanController extends Controller
         return view('member.loans.index', compact('loans'));
     }
 
-    public function show(Book $book): View
-    {
+    public function show(Book $book, Request $request, ManualAuthenticator $authenticator): View {
         $book->load(['category', 'authors']);
 
         $book->loadCount([
@@ -120,7 +120,9 @@ class LoanController extends Controller
             },
         ]);
 
-        return view('member.books.show', compact('book'));
+        $viewer = $authenticator->user($request);
+
+        return view('member.books.show', compact('book', 'viewer'));
     }
 
     public function renew(Request $request, Loan $loan, LoanService $loanService): RedirectResponse

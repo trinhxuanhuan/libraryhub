@@ -4,7 +4,7 @@
 @section('title', 'Dashboard — LibraryHub')
 
 @section('content')
-<div class="container-fluid py-4">
+<div class="dashboard-page">
 
     <div class="mb-4">
         <h1 class="h3 mb-1">Dashboard</h1>
