@@ -886,4 +886,170 @@ class LoanManagementTest extends TestCase
 
         $this->assertNull($item->fresh()->fine_paid_at);
     }
+
+    public function test_librarian_can_open_create_loan_page(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $this->get(route('librarian.loans.create'))
+            ->assertOk()
+            ->assertSeeText($this->member->name)
+            ->assertSeeText($book->title);
+    }
+
+    public function test_librarian_can_create_loan_for_member(): void
+    {
+        [$book1, $copy1] = $this->createBookWithCopy();
+        [$book2, $copy2] = $this->createBookWithCopy();
+
+        $response = $this->post(
+            route('librarian.loans.store'),
+            [
+                'member_id' => $this->member->id,
+                'book_ids' => [
+                    $book1->id,
+                    $book2->id,
+                ],
+            ]
+        );
+
+        $response->assertSessionHasNoErrors();
+
+        $loan = Loan::query()
+            ->where('user_id', $this->member->id)
+            ->latest('id')
+            ->firstOrFail();
+
+        $response->assertRedirect(
+            route('librarian.loans.show', $loan)
+        );
+
+        $this->assertSame('pending', $loan->status);
+        $this->assertCount(2, $loan->items);
+
+        foreach ($loan->items as $item) {
+            $this->assertNull($item->book_copy_id);
+        }
+
+        // Tạo phiếu chưa làm giảm tồn kho
+        $this->assertSame(
+            1,
+            (int) $book1->fresh()->available_copies
+        );
+
+        $this->assertSame(
+            1,
+            (int) $book2->fresh()->available_copies
+        );
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy1->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy2->fresh()->getRawOriginal('status')
+        );
+    }
+
+    public function test_librarian_cannot_create_loan_for_staff(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $this->post(
+            route('librarian.loans.store'),
+            [
+                'member_id' => $this->librarian->id,
+                'book_ids' => [$book->id],
+            ]
+        )->assertSessionHasErrors('member_id');
+
+        $this->assertDatabaseCount('loans', 0);
+    }
+
+    public function test_librarian_cannot_create_loan_for_inactive_member(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $inactiveMember = User::factory()->create();
+
+        $inactiveMember->forceFill([
+            'role' => UserRole::Member,
+            'is_active' => false,
+        ])->save();
+
+        $this->post(
+            route('librarian.loans.store'),
+            [
+                'member_id' => $inactiveMember->id,
+                'book_ids' => [$book->id],
+            ]
+        )->assertSessionHasErrors('member_id');
+
+        $this->assertDatabaseCount('loans', 0);
+    }
+
+    public function test_librarian_cannot_create_loan_with_duplicate_books(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $this->post(
+            route('librarian.loans.store'),
+            [
+                'member_id' => $this->member->id,
+                'book_ids' => [
+                    $book->id,
+                    $book->id,
+                ],
+            ]
+        )->assertSessionHasErrors();
+
+        $this->assertDatabaseCount('loans', 0);
+    }
+
+    public function test_librarian_cannot_create_loan_with_unavailable_book(): void
+    {
+        [$book, $copy] = $this->createBookWithCopy();
+
+        $copy->update([
+            'status' => BookCopyStatus::Unverified->value,
+        ]);
+
+        $book->update([
+            'available_copies' => 0,
+        ]);
+
+        $this->post(
+            route('librarian.loans.store'),
+            [
+                'member_id' => $this->member->id,
+                'book_ids' => [$book->id],
+            ]
+        )->assertSessionHasErrors('book_ids');
+
+        $this->assertDatabaseCount('loans', 0);
+    }
+
+    public function test_member_cannot_create_loan_as_librarian(): void
+    {
+        $this->withSession([
+            'manual_auth_user_id' => $this->member->id,
+        ]);
+
+        [$book] = $this->createBookWithCopy();
+
+        $this->get(route('librarian.loans.create'))
+            ->assertForbidden();
+
+        $this->post(
+            route('librarian.loans.store'),
+            [
+                'member_id' => $this->member->id,
+                'book_ids' => [$book->id],
+            ]
+        )->assertForbidden();
+
+        $this->assertDatabaseCount('loans', 0);
+    }
 }

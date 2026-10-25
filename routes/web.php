@@ -103,6 +103,10 @@ Route::middleware(['manual.auth', 'role:admin,librarian'])
     ->group(function () {
         Route::get('/loans', [LibrarianLoanController::class, 'index'])
             ->name('loans.index');
+        Route::get('/loans/create', [LibrarianLoanController::class, 'create'])
+            ->name('loans.create');
+        Route::post('/loans', [LibrarianLoanController::class, 'store'])
+            ->name('loans.store');
 
         Route::get('/loans/{loan}', [LibrarianLoanController::class, 'show'])
             ->name('loans.show');

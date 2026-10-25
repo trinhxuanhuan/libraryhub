@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Librarian;
 
 use App\Enums\BookCopyStatus;
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Loan;
 use App\Models\LoanItem;
+use App\Models\User;
 use App\Services\LoanService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -208,5 +212,70 @@ class LoanController extends Controller
         return redirect()
             ->route('librarian.loans.show', $loan)
             ->with('success', 'Đã xác nhận thu tiền phạt thành công.');
+    }
+
+    public function create(): View
+    {
+        // Chỉ hiển thị thành viên đang hoạt động
+        $members = User::query()
+            ->where('role', UserRole::Member->value)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        // Chỉ hiển thị đầu sách có bản vật lý khả dụng
+        $books = Book::query()
+            ->where('available_copies', '>', 0)
+            ->whereHas('copies', function ($query) {
+                $query->where(
+                    'status',
+                    BookCopyStatus::Available->value
+                );
+            })
+            ->orderBy('title')
+            ->get(['id', 'title', 'available_copies']);
+
+        return view('librarian.loans.create', compact(
+            'members',
+            'books'
+        ));
+    }
+
+    public function store(Request $request, LoanService $loanService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'member_id' => [
+                'required',
+                'integer',
+                Rule::exists('users', 'id')
+                    ->where('role', UserRole::Member->value)
+                    ->where('is_active', true),
+            ],
+            'book_ids' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+            'book_ids.*' => [
+                'required',
+                'integer',
+                'distinct',
+                Rule::exists('books', 'id')
+                    ->whereNull('deleted_at'),
+            ],
+        ]);
+
+        // Dùng lại nghiệp vụ tạo phiếu có sẵn
+        $loan = $loanService->requestLoan(
+            (int) $validated['member_id'],
+            array_map('intval', $validated['book_ids'])
+        );
+
+        return redirect()
+            ->route('librarian.loans.show', $loan)
+            ->with(
+                'success',
+                'Đã tạo phiếu mượn. Hãy chọn bản sách để giao.'
+            );
     }
 }

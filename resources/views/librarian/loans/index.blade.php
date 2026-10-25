@@ -1,4 +1,3 @@
-
 @extends('layouts.app')
 
 @section('title', 'Quản lý phiếu mượn — LibraryHub')
@@ -7,6 +6,7 @@
 <div class="card shadow-sm">
     <div class="card-body">
 
+        {{-- Tiêu đề và nút tạo phiếu mượn --}}
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
                 <h1 class="h3 mb-1">Quản lý phiếu mượn</h1>
@@ -14,6 +14,12 @@
                     Theo dõi yêu cầu, giao và nhận trả sách.
                 </p>
             </div>
+
+            {{-- Nút tạo phiếu mượn --}}
+            <a href="{{ route('librarian.loans.create') }}"
+               class="btn btn-primary">
+                + Tạo phiếu mượn
+            </a>
         </div>
 
         {{-- Hiển thị lỗi lọc dữ liệu --}}
@@ -24,7 +30,6 @@
                 @endforeach
             </div>
         @endif
-
         {{-- Bộ lọc phiếu mượn --}}
         <form method="GET"
               action="{{ route('librarian.loans.index') }}"
