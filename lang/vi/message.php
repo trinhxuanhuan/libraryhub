@@ -54,5 +54,11 @@ return [
         'rejected_by_staff' => 'Yêu cầu mượn đã bị thư viện từ chối.',
         'rejected_book_retired' => 'Thư viện đã ngừng cung cấp đầu sách ":book". Phiếu mượn đã bị từ chối. Vui lòng gửi yêu cầu mới nếu muốn mượn các sách khác.',
         'invalid_date_range' => 'Ngày kết thúc phải từ ngày bắt đầu trở đi.',
+        'renewed' => 'Gia hạn phiếu mượn thành công.',
+        'issued' => 'Đã duyệt và giao sách thành công.',
+        'rejected' => 'Đã từ chối yêu cầu mượn sách.',
+        'item_processed' => 'Đã ghi nhận xử lý bản sách thành công.',
+        'fine_paid' => 'Đã xác nhận thu tiền phạt thành công.',
+        'created' => 'Đã tạo phiếu mượn. Hãy chọn bản sách để giao.',
     ],
 ];

@@ -6,12 +6,10 @@ use App\Enums\BookCopyStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Book;
 use App\Models\User;
-use App\Services\LoanService;
+use App\Services\BookSelectionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class BookSelectionController extends Controller
@@ -46,34 +44,22 @@ class BookSelectionController extends Controller
     }
 
     // Thêm một đầu sách vào danh sách mượn tạm
-    public function store(Request $request, Book $book): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        Book $book,
+        BookSelectionService $selectionService
+    ): RedirectResponse {
         $validated = $request->validate([
             'quantity' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
 
         $quantity = (int) ($validated['quantity'] ?? 1);
 
-        // Số bản thực tế có thể mượn
-        $available = max(0, min(
-            (int) $book->available_copies,
-            (int) $book->copies()
-                ->where('status', BookCopyStatus::Available->value)
-                ->count()
-        ));
-
-        if ($quantity > $available) {
-            throw ValidationException::withMessages([
-                'quantity' => __('message.loans.books_unavailable'),
-            ]);
-        }
-
-        $user = $this->currentMember($request);
-
-        // Thêm sách mới hoặc cập nhật số lượng nếu đã chọn
-        $user->selectedBooks()->syncWithoutDetaching([
-            $book->id => ['quantity' => $quantity],
-        ]);
+        $selectionService->add(
+            $this->currentMember($request),
+            $book,
+            $quantity
+        );
 
         return redirect()
             ->route('member.selection.index')
@@ -83,11 +69,13 @@ class BookSelectionController extends Controller
     // Bỏ một đầu sách khỏi danh sách tạm
     public function destroy(
         Request $request,
-        int $bookId
+        int $bookId,
+        BookSelectionService $selectionService
     ): RedirectResponse {
-        $user = $this->currentMember($request);
-
-        $user->selectedBooks()->detach($bookId);
+        $selectionService->remove(
+            $this->currentMember($request),
+            $bookId
+        );
 
         return redirect()
             ->route('member.selection.index')
@@ -97,39 +85,11 @@ class BookSelectionController extends Controller
     // Xác nhận và tạo phiếu mượn chính thức
     public function submit(
         Request $request,
-        LoanService $loanService
+        BookSelectionService $selectionService
     ): RedirectResponse {
-        $user = $this->currentMember($request);
-
-        $selections = $user->selectedBooks()
-            ->get(['books.id']);
-
-        $bookIds = $selections
-            ->flatMap(fn (Book $book) => array_fill(
-                0,
-                (int) $book->pivot->quantity,
-                (int) $book->id
-            ))
-            ->all();
-
-        if (empty($bookIds)) {
-            throw ValidationException::withMessages([
-                'book_ids' => __('message.loans.selection_empty'),
-            ]);
-        }
-
-        DB::transaction(function () use (
-            $loanService,
-            $user,
-            $bookIds,
-            $selections
-        ) {
-            $loanService->requestLoan($user->id, $bookIds);
-
-            $user->selectedBooks()->detach(
-                $selections->modelKeys()
-            );
-        });
+        $selectionService->submit(
+            $this->currentMember($request)
+        );
 
         return redirect()
             ->route('member.loans.index')

@@ -10,6 +10,7 @@ use App\Models\BookCopy;
 use App\Models\Loan;
 use App\Models\LoanItem;
 use App\Models\User;
+use App\Queries\LoanListQuery;
 use App\Services\LoanService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,8 +20,10 @@ use Illuminate\View\View;
 
 class LoanController extends Controller
 {
-    public function index(Request $request): View
-    {
+    public function index(
+        Request $request,
+        LoanListQuery $loanListQuery
+    ): View {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
             'status' => [
@@ -31,8 +34,6 @@ class LoanController extends Controller
             'to_date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
-        $search = trim($filters['search'] ?? '');
-        $status = $filters['status'] ?? '';
         $fromDate = $filters['from_date'] ?? null;
         $toDate = $filters['to_date'] ?? null;
 
@@ -42,68 +43,11 @@ class LoanController extends Controller
             ]);
         }
 
-        $query = Loan::query()
-            ->with([
-                'user',
-                'items.book',
-            ])
-            ->withCount('items');
-
-        // Tìm theo mã phiếu, tên hoặc email thành viên
-        if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('user', function ($userQuery) use ($search) {
-                    $userQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
-                });
-
-                if (ctype_digit($search)) {
-                    $q->orWhere('loans.id', (int) $search);
-                }
-            });
-        }
-
-        // Lọc theo trạng thái
-        if ($status === 'overdue') {
-            $query->where('status', 'borrowed')
-                ->where('due_at', '<', now());
-        } elseif ($status === 'borrowed') {
-            $query->where('status', 'borrowed')
-                ->where(function ($q) {
-                    $q->whereNull('due_at')
-                        ->orWhere('due_at', '>=', now());
-                });
-        } elseif ($status !== '') {
-            $query->where('status', $status);
-        }
-
-        // Khoảng ngày yêu cầu mượn
-        if ($fromDate) {
-            $query->whereDate('created_at', '>=', $fromDate);
-        }
-
-        if ($toDate) {
-            $query->whereDate('created_at', '<=', $toDate);
-        }
-
-        // Ưu tiên chờ xử lý, tiếp theo là quá hạn
-        $loans = $query
-            ->orderByRaw(
-                "CASE
-                    WHEN status = 'pending' THEN 0
-                    WHEN status = 'borrowed' AND due_at < ? THEN 1
-                    WHEN status = 'borrowed' THEN 2
-                    ELSE 3
-                END",
-                [now()]
-            )
-            ->latest('id')
-            ->paginate(15)
+        $loans = $loanListQuery
+            ->paginate($filters)
             ->withQueryString();
 
-        return view('management.loans.index', [
-            'loans' => $loans,
-        ]);
+        return view('management.loans.index', compact('loans'));
     }
 
     // Xem chi tiết một phiếu mượn
@@ -162,7 +106,7 @@ class LoanController extends Controller
 
         return redirect()
             ->route('management.loans.show', $loan)
-            ->with('success', 'Đã duyệt và giao sách thành công.');
+            ->with('success', __('message.loans.management.issued'));
     }
 
     // Từ chối yêu cầu mượn
@@ -174,7 +118,7 @@ class LoanController extends Controller
 
         return redirect()
             ->route('management.loans.show', $loan)
-            ->with('success', 'Đã từ chối yêu cầu mượn sách.');
+            ->with('success', __('message.loans.management.rejected'));
     }
 
     // Xác nhận trả một bản sách
@@ -201,7 +145,7 @@ class LoanController extends Controller
 
         return redirect()
             ->route('management.loans.show', $loan)
-            ->with('success', 'Đã ghi nhận xử lý bản sách thành công.');
+            ->with('success', __('message.loans.management.item_processed'));
     }
 
     public function confirmFinePayment(Loan $loan, LoanItem $item, LoanService $loanService): RedirectResponse
@@ -213,7 +157,7 @@ class LoanController extends Controller
 
         return redirect()
             ->route('management.loans.show', $loan)
-            ->with('success', 'Đã xác nhận thu tiền phạt thành công.');
+            ->with('success', __('message.loans.management.fine_paid'));
     }
 
     public function create(): View
@@ -275,9 +219,6 @@ class LoanController extends Controller
 
         return redirect()
             ->route('management.loans.show', $loan)
-            ->with(
-                'success',
-                'Đã tạo phiếu mượn. Hãy chọn bản sách để giao.'
-            );
+            ->with('success', __('message.loans.management.created'));
     }
 }

@@ -128,7 +128,8 @@
                                 </form>
                             @elseif ($isGuest)
                                 {{-- Route có middleware sẽ ghi nhớ trang để trở lại sau đăng nhập. --}}
-                                <a href="{{ route('member.books.show', $book) }}" class="btn btn-primary">
+                                <a href="{{ route('books.borrow', $book) }}"
+                                class="btn btn-primary">
                                     Đăng nhập để mượn sách
                                 </a>
                             @else

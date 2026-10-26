@@ -7,12 +7,14 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\BookCatalogController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Management\DashboardController;
 use App\Http\Controllers\Management\LoanController as ManagementLoanController;
 use App\Http\Controllers\Member\BookSelectionController;
 use App\Http\Controllers\Member\LoanController as MemberLoanController;
 use App\Http\Middleware\CheckManualAuth;
+use App\Models\Book;
 use Illuminate\Support\Facades\Route;
 
 // Public Routes
@@ -22,11 +24,16 @@ Route::get('/', [HomeController::class, 'index'])
 Route::get('/about', [AboutController::class, 'index'])
     ->name('about');
 
-Route::get('/books', [MemberLoanController::class, 'index'])
+Route::get('/books', [BookCatalogController::class, 'index'])
     ->name('books.index');
 
-Route::get('/books/{book}', [MemberLoanController::class, 'show'])
+Route::get('/books/{book}', [BookCatalogController::class, 'show'])
     ->name('books.show');
+Route::get('/books/{book}/borrow', function (Book $book) {
+    return redirect()->route('books.show', $book);
+})
+    ->middleware('manual.auth')
+    ->name('books.borrow');
 
 // Book, Author, Category Management - Admin & Librarian
 Route::middleware(['manual.auth', 'role:admin,librarian'])
@@ -86,14 +93,6 @@ Route::middleware([CheckManualAuth::class, 'role:member'])
     ->prefix('member')
     ->name('member.')
     ->group(function () {
-        // Danh sách sách có thể mượn
-        Route::get('/books', [MemberLoanController::class, 'index'])
-            ->name('books.index');
-
-        // Chi tiết sách
-        Route::get('/books/{book}', [MemberLoanController::class, 'show'])
-            ->name('books.show');
-
         // Gửi yêu cầu mượn sách
         Route::post('/loans', [MemberLoanController::class, 'store'])
             ->name('loans.store');

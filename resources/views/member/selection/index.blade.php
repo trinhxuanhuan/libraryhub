@@ -6,7 +6,7 @@
     <h2 class="mb-3">Danh sách sách muốn mượn</h2>
 
     <a
-        href="{{ route('member.books.index') }}"
+        href="{{ route('books.index') }}"
         class="btn btn-outline-primary mb-3"
     >
         ← Tiếp tục chọn sách
@@ -51,7 +51,7 @@
 
                         <div>
                             <a
-                                href="{{ route('member.books.show', $book) }}"
+                                href="{{ route('books.show', $book) }}"
                                 class="fw-semibold text-decoration-none"
                             >
                                 {{ $book->title }}

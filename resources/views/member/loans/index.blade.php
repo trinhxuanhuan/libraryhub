@@ -24,7 +24,7 @@
     @endif
 
     {{-- Quay lại danh sách sách --}}
-    <a href="{{ route('member.books.index') }}"
+    <a href="{{ route('books.index') }}"
        class="btn btn-primary mb-4">
         Tiếp tục chọn sách
     </a>

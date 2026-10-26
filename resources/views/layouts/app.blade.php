@@ -53,7 +53,7 @@
                     {{-- Danh mục sách luôn công khai, kể cả khi chưa đăng nhập. --}}
                     <li class="nav-item">
                         <a
-                            class="nav-link {{ request()->routeIs('books.*', 'member.books.*') ? 'active' : '' }}"
+                            class="nav-link {{ request()->routeIs('books.*') ? 'active' : '' }}"
                             href="{{ route('books.index') }}"
                         >
                             Danh mục sách
