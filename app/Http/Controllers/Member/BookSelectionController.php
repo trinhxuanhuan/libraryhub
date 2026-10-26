@@ -5,32 +5,31 @@ namespace App\Http\Controllers\Member;
 use App\Enums\BookCopyStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Book;
+use App\Models\User;
 use App\Services\LoanService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class BookSelectionController extends Controller
 {
     // Tạo key Session riêng cho từng Member
-    private function selectionKey(Request $request): string
+    private function currentMember(Request $request): User
     {
         $memberId = (int) $request->session()
             ->get('manual_auth_user_id');
 
-        return 'loan_selected_books_'.$memberId;
+        return User::findOrFail($memberId);
     }
 
     // Hiển thị danh sách sách đã chọn
     public function index(Request $request): View
     {
-        $key = $this->selectionKey($request);
-
-        $selectedIds = $request->session()->get($key, []);
-
-        $books = Book::query()
+        $books = $this->currentMember($request)
+            ->selectedBooks()
             ->with(['authors', 'category'])
             ->withCount([
                 'copies as available_copy_count' => function (Builder $query) {
@@ -40,15 +39,8 @@ class BookSelectionController extends Controller
                     );
                 },
             ])
-            ->whereIn('id', $selectedIds)
-            ->orderBy('title')
+            ->orderBy('books.title')
             ->get();
-
-        // Loại bỏ ID sách đã bị xóa khỏi danh sách tạm
-        $request->session()->put(
-            $key,
-            $books->pluck('id')->all()
-        );
 
         return view('member.selection.index', compact('books'));
     }
@@ -56,30 +48,32 @@ class BookSelectionController extends Controller
     // Thêm một đầu sách vào danh sách mượn tạm
     public function store(Request $request, Book $book): RedirectResponse
     {
-        $hasAvailableCopy = (int) $book->available_copies > 0
-            && $book->copies()
-                ->where('status', BookCopyStatus::Available->value)
-                ->exists();
+        $validated = $request->validate([
+            'quantity' => ['sometimes', 'required', 'integer', 'min:1'],
+        ]);
 
-        if (! $hasAvailableCopy) {
+        $quantity = (int) ($validated['quantity'] ?? 1);
+
+        // Số bản thực tế có thể mượn
+        $available = max(0, min(
+            (int) $book->available_copies,
+            (int) $book->copies()
+                ->where('status', BookCopyStatus::Available->value)
+                ->count()
+        ));
+
+        if ($quantity > $available) {
             throw ValidationException::withMessages([
-                'book_ids' => __('message.loans.books_unavailable'),
+                'quantity' => __('message.loans.books_unavailable'),
             ]);
         }
 
-        $key = $this->selectionKey($request);
+        $user = $this->currentMember($request);
 
-        $selectedIds = array_map(
-            'intval',
-            $request->session()->get($key, [])
-        );
-
-        // Chỉ chọn một bản cho mỗi đầu sách
-        if (! in_array($book->id, $selectedIds, true)) {
-            $selectedIds[] = $book->id;
-        }
-
-        $request->session()->put($key, $selectedIds);
+        // Thêm sách mới hoặc cập nhật số lượng nếu đã chọn
+        $user->selectedBooks()->syncWithoutDetaching([
+            $book->id => ['quantity' => $quantity],
+        ]);
 
         return redirect()
             ->route('member.selection.index')
@@ -91,16 +85,9 @@ class BookSelectionController extends Controller
         Request $request,
         int $bookId
     ): RedirectResponse {
-        $key = $this->selectionKey($request);
+        $user = $this->currentMember($request);
 
-        $selectedIds = $request->session()->get($key, []);
-
-        $selectedIds = array_values(array_filter(
-            $selectedIds,
-            fn ($id) => (int) $id !== $bookId
-        ));
-
-        $request->session()->put($key, $selectedIds);
+        $user->selectedBooks()->detach($bookId);
 
         return redirect()
             ->route('member.selection.index')
@@ -112,12 +99,18 @@ class BookSelectionController extends Controller
         Request $request,
         LoanService $loanService
     ): RedirectResponse {
-        $key = $this->selectionKey($request);
+        $user = $this->currentMember($request);
 
-        $bookIds = array_map(
-            'intval',
-            $request->session()->get($key, [])
-        );
+        $selections = $user->selectedBooks()
+            ->get(['books.id']);
+
+        $bookIds = $selections
+            ->flatMap(fn (Book $book) => array_fill(
+                0,
+                (int) $book->pivot->quantity,
+                (int) $book->id
+            ))
+            ->all();
 
         if (empty($bookIds)) {
             throw ValidationException::withMessages([
@@ -125,14 +118,18 @@ class BookSelectionController extends Controller
             ]);
         }
 
-        $memberId = (int) $request->session()
-            ->get('manual_auth_user_id');
+        DB::transaction(function () use (
+            $loanService,
+            $user,
+            $bookIds,
+            $selections
+        ) {
+            $loanService->requestLoan($user->id, $bookIds);
 
-        // Service kiểm tra lại và tạo Loan và LoanItem
-        $loanService->requestLoan($memberId, $bookIds);
-
-        // Chỉ xóa Session sau khi tạo phiếu thành công
-        $request->session()->forget($key);
+            $user->selectedBooks()->detach(
+                $selections->modelKeys()
+            );
+        });
 
         return redirect()
             ->route('member.loans.index')

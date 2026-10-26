@@ -11,13 +11,6 @@
     >
         ← Tiếp tục chọn sách
     </a>
-
-    @if (session('success'))
-        <div class="alert alert-success">
-            {{ session('success') }}
-        </div>
-    @endif
-
     @if ($errors->any())
         <div class="alert alert-danger">
             @foreach ($errors->all() as $error)
@@ -31,11 +24,18 @@
             Bạn chưa chọn cuốn sách nào.
         </div>
     @else
+        @php
+            $selectedCopyCount = $books->sum(
+                fn ($book) => (int) $book->pivot->quantity
+            );
+        @endphp
+
         <div class="card">
             <div class="card-body">
 
                 <h5 class="mb-3">
-                    Đã chọn {{ $books->count() }} cuốn sách
+                    Đã chọn {{ $books->count() }} đầu sách
+                    ({{ $selectedCopyCount }} bản)
                 </h5>
 
                 @foreach ($books as $book)
@@ -61,6 +61,12 @@
                                 {{ $book->authors->pluck('name')->join(', ') }}
                             </div>
 
+                            <div class="mt-2">
+                                <span class="fw-semibold">
+                                    Muốn mượn: {{ (int) $book->pivot->quantity }} bản
+                                </span>
+                            </div>
+
                             @if ($available > 0)
                                 <span class="badge bg-success mt-1">
                                     Còn {{ $available }} bản
@@ -71,21 +77,63 @@
                                 </span>
                             @endif
                         </div>
+                        <div class="d-flex flex-wrap align-items-end gap-2">
 
-                        <form
-                            method="POST"
-                            action="{{ route('member.selection.remove', $book->id) }}"
-                        >
-                            @csrf
-                            @method('DELETE')
-
-                            <button
-                                type="submit"
-                                class="btn btn-sm btn-outline-danger"
+                            {{-- Cập nhật số lượng --}}
+                            <form
+                                action="{{ route('member.selection.add', $book) }}"
+                                method="POST"
+                                class="d-flex align-items-end gap-2"
                             >
-                                Bỏ chọn
-                            </button>
-                        </form>
+                                @csrf
+
+                                <div>
+                                    <label
+                                        for="quantity-{{ $book->id }}"
+                                        class="form-label small"
+                                    >
+                                        Số lượng
+                                    </label>
+
+                                    <input
+                                        type="number"
+                                        name="quantity"
+                                        id="quantity-{{ $book->id }}"
+                                        class="form-control form-control-sm"
+                                        min="1"
+                                        max="{{ $available }}"
+                                        value="{{ (int) $book->pivot->quantity }}"
+                                        style="width: 85px"
+                                        required
+                                    >
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-sm btn-outline-primary"
+                                    @disabled($available <= 0)
+                                >
+                                    Cập nhật
+                                </button>
+                            </form>
+
+                            {{-- Bỏ chọn sách --}}
+                            <form
+                                method="POST"
+                                action="{{ route('member.selection.remove', $book->id) }}"
+                            >
+                                @csrf
+                                @method('DELETE')
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-sm btn-outline-danger"
+                                >
+                                    Bỏ chọn
+                                </button>
+                            </form>
+
+                        </div>
                     </div>
                 @endforeach
 

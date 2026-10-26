@@ -48,5 +48,7 @@ return [
         'selection_added' => 'Đã thêm sách vào danh sách muốn mượn.',
         'selection_removed' => 'Đã bỏ sách khỏi danh sách muốn mượn.',
         'selection_empty' => 'Vui lòng chọn ít nhất một cuốn sách.',
+        'already_borrowing' => 'Bạn đã có yêu cầu đang chờ duyệt hoặc đang mượn một trong các đầu sách đã chọn.',
+        'duplicate_physical_copy' => 'Bạn đang chọn trùng mã barcode. Mỗi bản sách vật lý chỉ được giao một lần.',
     ],
 ];

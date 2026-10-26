@@ -147,6 +147,8 @@ class LoanController extends Controller
                 'distinct',
                 'exists:book_copies,id',
             ],
+        ], [
+            'copies.*.distinct' => __('message.loans.duplicate_physical_copy'),
         ]);
 
         $librarianId = (int) $request->session()

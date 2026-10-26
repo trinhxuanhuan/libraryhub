@@ -20,7 +20,7 @@
     @endphp
 
     {{-- Navbar dùng chung cho Guest, Member, Librarian và Admin. --}}
-    <nav class="navbar navbar-expand-lg navbar-dark libraryhub-topbar border-bottom shadow-sm sticky-top">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary libraryhub-topbar border-bottom shadow-sm sticky-top">
         <div class="container-xl">
             <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="{{ route('home') }}">
                 <span class="libraryhub-brand-mark">LH</span>
@@ -180,7 +180,7 @@
     @endif
 
     {{-- Flash messages: Bootstrap Toast được khởi tạo bởi resources/js/app.js. --}}
-    @if (session('success') || session('error'))
+    @if (session('success') || session('error') || $errors->any())
         <div
             class="toast-container position-fixed bottom-0 end-0 p-3 flash-toast-container"
             aria-label="Thông báo hệ thống"
@@ -207,6 +207,39 @@
                 </div>
             @endif
 
+            {{-- Validation errors --}}
+            @if ($errors->any())
+                <div
+                    class="toast align-items-center text-bg-danger border-0"
+                    role="alert"
+                    aria-live="assertive"
+                    aria-atomic="true"
+                    data-flash-toast
+                    data-bs-autohide="true"
+                    data-bs-delay="8000"
+                >
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <div class="fw-semibold mb-1">
+                                Không thể thực hiện thao tác
+                            </div>
+
+                            @foreach (collect($errors->all())->unique() as $error)
+                                <div>{{ $error }}</div>
+                            @endforeach
+                        </div>
+
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white me-2 m-auto"
+                            data-bs-dismiss="toast"
+                            aria-label="Đóng thông báo"
+                        ></button>
+                    </div>
+                </div>
+            @endif
+
+            {{-- Thông báo lỗi nghiệp vụ --}}
             @if (session('error'))
                 <div
                     class="toast align-items-center text-bg-danger border-0"
@@ -218,7 +251,10 @@
                     data-bs-delay="7000"
                 >
                     <div class="d-flex">
-                        <div class="toast-body">{{ session('error') }}</div>
+                        <div class="toast-body">
+                            {{ session('error') }}
+                        </div>
+
                         <button
                             type="button"
                             class="btn-close btn-close-white me-2 m-auto"
@@ -228,6 +264,7 @@
                     </div>
                 </div>
             @endif
+
         </div>
     @endif
 

@@ -3,11 +3,11 @@
 @section('title', 'Quản lý phiếu mượn — LibraryHub')
 
 @section('content')
-<div class="card shadow-sm">
+<div class="card border-0 shadow-sm rounded-4">
     <div class="card-body">
 
         {{-- Tiêu đề và nút tạo phiếu mượn --}}
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
             <div>
                 <h1 class="h3 mb-1">Quản lý phiếu mượn</h1>
                 <p class="text-muted mb-0">
@@ -140,7 +140,7 @@
             </p>
 
             <small class="text-muted">
-                15 phiếu / trang
+                {{ $loans->perPage() }} phiếu / trang
             </small>
         </div>
 

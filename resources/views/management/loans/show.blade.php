@@ -4,7 +4,7 @@
 @section('title', 'Chi tiết phiếu mượn — LibraryHub')
 
 @section('content')
-<div class="container py-4">
+<div class="w-100">
     @php
         $isOverdue = $loan->status === 'borrowed'
             && $loan->due_at !== null
@@ -21,11 +21,11 @@
         $totalFine = $totalOverdueFine + $totalCompensation;
     @endphp
 
-    <div class="card shadow-sm">
+    <div class="card border-0 shadow-sm rounded-4">
         <div class="card-body">
 
             {{-- Tiêu đề và quay lại --}}
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
                 <h1 class="h3 mb-0">
                     Phiếu mượn #{{ $loan->id }}
                 </h1>
@@ -35,25 +35,6 @@
                     Quay lại
                 </a>
             </div>
-
-            {{-- Thông báo thành công --}}
-            @if (session('success'))
-                <div class="alert alert-success">
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            {{-- Thông báo lỗi --}}
-            @if ($errors->any())
-                <div class="alert alert-danger">
-                    <ul class="mb-0">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
             {{-- Thông tin phiếu mượn --}}
             <div class="border rounded p-3 mb-4">
                 <h2 class="h5 mb-3">Thông tin phiếu mượn</h2>
@@ -285,15 +266,35 @@
                                         </div>
 
                                         @if ($itemTotalFine > 0)
-                                            <div class="small mt-1">
+                                            <div class="mt-2">
                                                 @if ($item->fine_paid_at)
-                                                    <span class="text-success">
+                                                    <span class="badge bg-success">
                                                         Đã thanh toán
                                                     </span>
+
+                                                    <div class="small text-muted mt-1">
+                                                        {{ $item->fine_paid_at->format('d/m/Y H:i') }}
+                                                    </div>
                                                 @else
-                                                    <span class="text-danger">
-                                                        Chưa ghi nhận thanh toán
+                                                    <span class="badge bg-warning text-dark">
+                                                        Chưa thanh toán
                                                     </span>
+
+                                                    <form
+                                                        action="{{ route('management.loans.items.confirm-payment', [$loan, $item]) }}"
+                                                        method="POST"
+                                                        class="mt-2"
+                                                        onsubmit="return confirm('Xác nhận đã nhận đủ {{ number_format($itemTotalFine, 0, ',', '.') }} đ?')"
+                                                    >
+                                                        @csrf
+
+                                                        <button
+                                                            type="submit"
+                                                            class="btn btn-sm btn-outline-success"
+                                                        >
+                                                            Xác nhận đã thu tiền
+                                                        </button>
+                                                    </form>
                                                 @endif
                                             </div>
                                         @endif
@@ -416,43 +417,6 @@
                             {{ number_format($totalFine, 0, ',', '.') }} đ
                         </strong>
                     </div>
-                    @if ($itemTotalFine > 0)
-                        <div class="mt-2">
-
-                            @if ($item->fine_paid_at)
-                                <span class="badge bg-success">
-                                    Đã thanh toán
-                                </span>
-
-                                <div class="small text-muted mt-1">
-                                    {{ $item->fine_paid_at->format('d/m/Y H:i') }}
-                                </div>
-
-                            @elseif ($item->resolved_at !== null)
-                                <span class="badge bg-warning text-dark">
-                                    Chưa thanh toán
-                                </span>
-
-                                <form
-                                    method="POST"
-                                    action="{{ route('management.loans.items.confirm-payment', [$loan, $item]) }}"
-                                    class="mt-2"
-                                    onsubmit="return confirm('Bạn xác nhận đã nhận đủ {{ number_format($itemTotalFine, 0, ',', '.') }} đ?')"
-                                >
-                                    @csrf
-
-                                    <button
-                                        type="submit"
-                                        class="btn btn-sm btn-outline-success"
-                                    >
-                                        Xác nhận đã thu tiền
-                                    </button>
-                                </form>
-                            @endif
-
-                        </div>
-                    @endif
-
                 </div>
             @endif
 

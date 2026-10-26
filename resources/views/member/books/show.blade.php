@@ -97,10 +97,33 @@
                                     Hết sách
                                 </button>
                             @elseif ($isMember)
-                                <form action="{{ route('member.selection.add', $book) }}" method="POST">
+                                <form
+                                    action="{{ route('member.selection.add', $book) }}"
+                                    method="POST"
+                                    class="d-flex flex-wrap align-items-end gap-2"
+                                >
                                     @csrf
+
+                                    <div>
+                                        <label for="quantity" class="form-label">
+                                            Số lượng muốn mượn
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            name="quantity"
+                                            id="quantity"
+                                            class="form-control"
+                                            min="1"
+                                            max="{{ $available }}"
+                                            value="{{ old('quantity', 1) }}"
+                                            style="width: 130px"
+                                            required
+                                        >
+                                    </div>
+
                                     <button type="submit" class="btn btn-primary">
-                                        Mượn sách
+                                        Thêm vào danh sách
                                     </button>
                                 </form>
                             @elseif ($isGuest)

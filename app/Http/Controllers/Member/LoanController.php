@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Member;
-use App\Services\ManualAuthenticator;
+
 use App\Enums\BookCopyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreLoanRequest;
@@ -9,6 +9,7 @@ use App\Models\Book;
 use App\Models\Category;
 use App\Models\Loan;
 use App\Services\LoanService;
+use App\Services\ManualAuthenticator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,6 +77,7 @@ class LoanController extends Controller
             ->get();
 
         $viewer = $authenticator->user($request);
+
         return view('member.books.index', compact('books', 'categories', 'viewer'));
     }
 
@@ -108,7 +110,8 @@ class LoanController extends Controller
         return view('member.loans.index', compact('loans'));
     }
 
-    public function show(Book $book, Request $request, ManualAuthenticator $authenticator): View {
+    public function show(Book $book, Request $request, ManualAuthenticator $authenticator): View
+    {
         $book->load(['category', 'authors']);
 
         $book->loadCount([

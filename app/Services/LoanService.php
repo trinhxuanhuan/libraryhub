@@ -7,6 +7,7 @@ use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Loan;
 use App\Models\LoanItem;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,22 +17,64 @@ class LoanService
     public function requestLoan(int $memberId, array $bookIds): Loan
     {
         return DB::transaction(function () use ($memberId, $bookIds) {
-            // Kiểm tra sách còn khả dụng tại lúc tạo yêu cầu
-            $availableBooksCount = Book::query()
-                ->whereIn('id', $bookIds)
-                ->where('available_copies', '>', 0)
-                ->whereHas('copies', function (Builder $query) {
-                    $query->where(
-                        'status',
-                        BookCopyStatus::Available->value
-                    );
-                })
-                ->count();
+            // Khóa Member để tránh hai yêu cầu mượn được tạo đồng thời
+            User::query()
+                ->whereKey($memberId)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            if ($availableBooksCount !== count($bookIds)) {
+            // Kiểm tra đầu sách đang chờ duyệt hoặc chưa trả
+            $alreadyBorrowing = LoanItem::query()
+                ->whereIn('book_id', $bookIds)
+                ->whereNull('resolved_at')
+                ->whereHas('loan', function (Builder $query) use ($memberId) {
+                    $query->where('user_id', $memberId)
+                        ->whereIn('status', ['pending', 'borrowed']);
+                })
+                ->exists();
+
+            if ($alreadyBorrowing) {
                 throw ValidationException::withMessages([
-                    'book_ids' => __('message.loans.books_unavailable'),
+                    'book_ids' => __('message.loans.already_borrowing'),
                 ]);
+            }
+            // Đếm số bản được yêu cầu theo từng đầu sách
+            $requestedQuantities = array_count_values($bookIds);
+
+            if (empty($requestedQuantities)) {
+                throw ValidationException::withMessages([
+                    'book_ids' => __('message.loans.selection_empty'),
+                ]);
+            }
+
+            // Lấy số lượng khả dụng của các đầu sách
+            $books = Book::query()
+                ->select(['id', 'available_copies'])
+                ->whereIn('id', array_keys($requestedQuantities))
+                ->withCount([
+                    'copies as available_copy_count' => function (Builder $query) {
+                        $query->where(
+                            'status',
+                            BookCopyStatus::Available->value
+                        );
+                    },
+                ])
+                ->get()
+                ->keyBy('id');
+
+            // Kiểm tra từng đầu sách có đủ số bản hay không
+            foreach ($requestedQuantities as $bookId => $quantity) {
+                $book = $books->get($bookId);
+
+                if (
+                    $book === null ||
+                    (int) $book->available_copies < $quantity ||
+                    (int) $book->available_copy_count < $quantity
+                ) {
+                    throw ValidationException::withMessages([
+                        'book_ids' => __('message.loans.books_unavailable'),
+                    ]);
+                }
             }
 
             // Tạo phiếu mượn
