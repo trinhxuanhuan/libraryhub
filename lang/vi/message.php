@@ -24,6 +24,7 @@ return [
         'deleted' => 'Xóa sách thành công.',
         'quantity_out_of_sync' => 'Số lượng sách đang không đồng bộ.',
         'decrease_copies_not_supported' => 'Chưa hỗ trợ giảm số bản sách.',
+        'retired' => 'Đã ngừng cung cấp đầu sách. Có :count phiếu chờ được từ chối.',
     ],
 
     'auth' => [
@@ -50,5 +51,8 @@ return [
         'selection_empty' => 'Vui lòng chọn ít nhất một cuốn sách.',
         'already_borrowing' => 'Bạn đã có yêu cầu đang chờ duyệt hoặc đang mượn một trong các đầu sách đã chọn.',
         'duplicate_physical_copy' => 'Bạn đang chọn trùng mã barcode. Mỗi bản sách vật lý chỉ được giao một lần.',
+        'rejected_by_staff' => 'Yêu cầu mượn đã bị thư viện từ chối.',
+        'rejected_book_retired' => 'Thư viện đã ngừng cung cấp đầu sách ":book". Phiếu mượn đã bị từ chối. Vui lòng gửi yêu cầu mới nếu muốn mượn các sách khác.',
+        'invalid_date_range' => 'Ngày kết thúc phải từ ngày bắt đầu trở đi.',
     ],
 ];

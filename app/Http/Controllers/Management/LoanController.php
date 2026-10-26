@@ -38,7 +38,7 @@ class LoanController extends Controller
 
         if ($fromDate && $toDate && $fromDate > $toDate) {
             throw ValidationException::withMessages([
-                'to_date' => 'Ngày kết thúc phải từ ngày bắt đầu trở đi.',
+                'to_date' => __('message.loans.invalid_date_range'),
             ]);
         }
 

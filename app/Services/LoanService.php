@@ -51,6 +51,8 @@ class LoanService
             $books = Book::query()
                 ->select(['id', 'available_copies'])
                 ->whereIn('id', array_keys($requestedQuantities))
+                ->orderBy('id')
+                ->lockForUpdate()
                 ->withCount([
                     'copies as available_copy_count' => function (Builder $query) {
                         $query->where(
@@ -143,9 +145,16 @@ class LoanService
 
             foreach ($items as $item) {
                 // Khóa đầu sách trước khi thay đổi số lượng
-                $book = Book::query()
+                $book = Book::withTrashed()
+                    ->whereKey($item->book_id)
                     ->lockForUpdate()
-                    ->findOrFail($item->book_id);
+                    ->first();
+
+                if ($book === null || $book->trashed()) {
+                    throw ValidationException::withMessages([
+                        'copies' => 'Một hoặc nhiều đầu sách trong phiếu đã ngừng cung cấp. Không thể giao sách.',
+                    ]);
+                }
 
                 $copyId = (int) $copyIds[$item->id];
 
@@ -188,14 +197,16 @@ class LoanService
                 'status' => 'borrowed',
                 'issued_by' => $librarianId,
                 'borrowed_at' => $borrowedAt,
-                'due_at' => $borrowedAt->copy()->addDays(14),
+                'due_at' => $borrowedAt->copy()->addDays(
+                    (int) config('library_loan.loan_duration_days')
+                ),
             ]);
         });
     }
 
-    public function rejectLoan(int $loanId): void
+    public function rejectLoan(int $loanId, ?string $reason = null): void
     {
-        DB::transaction(function () use ($loanId) {
+        DB::transaction(function () use ($loanId, $reason) {
             $loan = Loan::query()
                 ->lockForUpdate()
                 ->findOrFail($loanId);
@@ -208,6 +219,8 @@ class LoanService
 
             $loan->update([
                 'status' => 'rejected',
+                'rejection_reason' => $reason
+                    ?? __('message.loans.rejected_by_staff'),
             ]);
         });
     }
