@@ -204,8 +204,10 @@ class LoanService
         });
     }
 
-    public function rejectLoan(int $loanId, ?string $reason = null): void
-    {
+    public function rejectLoan(
+        int $loanId,
+        ?string $reason = null
+    ): void {
         DB::transaction(function () use ($loanId, $reason) {
             $loan = Loan::query()
                 ->lockForUpdate()
@@ -213,14 +215,13 @@ class LoanService
 
             if ($loan->status !== 'pending') {
                 throw ValidationException::withMessages([
-                    'loan' => 'Chỉ được từ chối phiếu đang chờ xử lý.',
+                    'loan' => __('message.loans.only_pending_can_reject'),
                 ]);
             }
 
             $loan->update([
                 'status' => 'rejected',
-                'rejection_reason' => $reason
-                    ?? __('message.loans.rejected_by_staff'),
+                'rejection_reason' => $reason,
             ]);
         });
     }

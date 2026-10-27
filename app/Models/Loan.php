@@ -11,6 +11,7 @@ class Loan extends Model
     protected $fillable = [
         'user_id',
         'status',
+        'rejection_reason',
         'issued_by',
         'borrowed_at',
         'due_at',

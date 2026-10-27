@@ -132,8 +132,14 @@
 
                             @elseif ($loan->status === 'rejected')
                                 <span class="badge bg-secondary">
-                                    Từ chối
+                                    Đã từ chối
                                 </span>
+
+                                @if ($loan->rejection_reason)
+                                    <div class="small text-danger mt-2">
+                                        {{ $loan->rejection_reason }}
+                                    </div>
+                                @endif
 
                             @else
                                 <span class="badge bg-secondary">

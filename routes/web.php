@@ -46,6 +46,9 @@ Route::middleware(['manual.auth', 'role:admin,librarian'])
             ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
             ->names('admin.authors');
 
+        Route::get('admin/books/{book}/retire', [BookController::class, 'retire'])
+            ->name('admin.books.retire');
+
         Route::resource('admin/books', BookController::class)
             ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
             ->names('admin.books');

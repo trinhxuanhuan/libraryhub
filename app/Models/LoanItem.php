@@ -39,7 +39,7 @@ class LoanItem extends Model
     // Member yêu cầu mượn đầu sách nào
     public function book(): BelongsTo
     {
-        return $this->belongsTo(Book::class);
+        return $this->belongsTo(Book::class)->withTrashed();
     }
 
     // Bản sách vật lý nào được giao

@@ -10,7 +10,10 @@ use App\Http\Requests\UpdateBookRequest;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Category;
+use App\Models\Loan;
+use App\Services\BookRetirementService;
 use App\Services\BookService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -101,12 +104,31 @@ class BookController extends Controller
             ->with('success', __('message.books.updated'));
     }
 
-    public function destroy(Book $book): RedirectResponse
-    {
-        $book->delete();
+    public function destroy(
+        Book $book,
+        BookRetirementService $retirementService
+    ): RedirectResponse {
+        $rejectedCount = $retirementService->retire($book);
 
         return redirect()
             ->route('admin.books.index')
-            ->with('success', __('message.books.deleted'));
+            ->with('success', __('message.books.retired', [
+                'count' => $rejectedCount,
+            ]));
+    }
+
+    public function retire(Book $book): View
+    {
+        $pendingLoansCount = Loan::query()
+            ->where('status', 'pending')
+            ->whereHas('items', function (Builder $query) use ($book) {
+                $query->where('book_id', $book->id);
+            })
+            ->count();
+
+        return view('admin.books.retire', compact(
+            'book',
+            'pendingLoansCount'
+        ));
     }
 }
