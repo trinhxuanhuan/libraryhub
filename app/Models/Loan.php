@@ -28,6 +28,7 @@ class Loan extends Model
             'renewal_count' => 'integer',
             'overdue_at' => 'datetime',
             'overdue_reminder_sent_at' => 'datetime',
+            'due_soon_reminder_sent_at' => 'datetime',
         ];
     }
 

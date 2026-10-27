@@ -5,4 +5,6 @@ return [
     'damaged_compensation' => 50000,
     'lost_compensation' => 200000,
     'loan_duration_days' => 14,
+    'due_soon_reminder_days' => 2,
+    'renewal_days' => 7,
 ];

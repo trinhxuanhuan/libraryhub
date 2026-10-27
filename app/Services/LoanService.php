@@ -413,11 +413,21 @@ class LoanService
                 ]);
             }
 
-            // Cộng thêm 7 ngày từ hạn trả hiện tại
-            $loan->update([
-                'due_at' => $loan->due_at->copy()->addDays(7),
-                'renewal_count' => $loan->renewal_count + 1,
-            ]);
+            // Cộng thêm số ngày gia hạn từ hạn trả hiện tại
+            // Lấy số ngày gia hạn từ config
+            $renewalDays = (int) config('library_loan.renewal_days');
+
+            // Cập nhật hạn trả mới
+            $loan->due_at = $loan->due_at->copy()->addDays($renewalDays);
+
+            // Tăng số lần gia hạn
+            $loan->renewal_count = (int) $loan->renewal_count + 1;
+
+            // Xóa dấu nhắc cũ vì hạn trả đã thay đổi
+            $loan->due_soon_reminder_sent_at = null;
+
+            // Lưu tất cả thay đổi vào database
+            $loan->save();
         });
     }
 

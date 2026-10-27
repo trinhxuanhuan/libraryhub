@@ -86,7 +86,7 @@ class LoanRenewalTest extends TestCase
         $this->assertSame('borrowed', $loan->status);
 
         $this->assertSame(
-            $oldDueAt->addDays(7)->toDateTimeString(),
+            $oldDueAt->addDays((int) config('library_loan.renewal_days'))->toDateTimeString(),
             $loan->due_at->toDateTimeString()
         );
     }
@@ -155,5 +155,69 @@ class LoanRenewalTest extends TestCase
             ->assertSessionHasErrors('loan');
 
         $this->assertSame(0, $this->loan->fresh()->renewal_count);
+    }
+
+    public function test_renewal_resets_due_soon_reminder_sent_at(): void
+    {
+        // Giả lập phiếu còn 1 ngày đến hạn
+        // và đã nhận email nhắc trước hạn
+        $this->loan->forceFill([
+            'due_at' => now()->addDay()->startOfSecond(),
+            'due_soon_reminder_sent_at' => now()->subHour(),
+        ])->save();
+
+        $oldDueAt = $this->loan->due_at->copy();
+
+        // Xác nhận trước khi gia hạn đã có thời điểm gửi email
+        $this->assertNotNull(
+            $this->loan->fresh()->due_soon_reminder_sent_at
+        );
+
+        // Member thực hiện gia hạn
+        $this->post(route('member.loans.renew', $this->loan))
+            ->assertRedirect(route('member.loans.index'))
+            ->assertSessionHasNoErrors();
+
+        // Lấy dữ liệu mới nhất từ database
+        $renewedLoan = $this->loan->fresh();
+
+        // Gia hạn thành công
+        $this->assertSame(1, $renewedLoan->renewal_count);
+
+        // Hạn trả phải được tăng đúng số ngày cấu hình
+        $this->assertSame(
+            $oldDueAt
+                ->addDays((int) config('library_loan.renewal_days'))
+                ->toDateTimeString(),
+            $renewedLoan->due_at->toDateTimeString()
+        );
+
+        // Phải đặt lại thời điểm nhắc để có thể gửi cho hạn mới
+        $this->assertNull(
+            $renewedLoan->due_soon_reminder_sent_at
+        );
+    }
+
+    public function test_renewal_uses_duration_from_config(): void
+    {
+        // Thay đổi quy định gia hạn thành 10 ngày
+        config()->set('library_loan.renewal_days', 10);
+
+        $oldDueAt = $this->loan->due_at->copy();
+
+        // Member gia hạn
+        $this->post(route('member.loans.renew', $this->loan))
+            ->assertRedirect(route('member.loans.index'))
+            ->assertSessionHasNoErrors();
+
+        $renewedLoan = $this->loan->fresh();
+
+        // Phải cộng đúng 10 ngày, không phải 7 ngày
+        $this->assertSame(
+            $oldDueAt->addDays(10)->toDateTimeString(),
+            $renewedLoan->due_at->toDateTimeString()
+        );
+
+        $this->assertSame(1, $renewedLoan->renewal_count);
     }
 }

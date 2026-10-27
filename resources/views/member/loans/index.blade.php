@@ -164,7 +164,7 @@
                                 <form
                                     method="POST"
                                     action="{{ route('member.loans.renew', $loan) }}"
-                                    onsubmit="return confirm('Bạn có chắc muốn gia hạn thêm 7 ngày?')"
+                                    onsubmit="return confirm('Bạn có chắc muốn gia hạn thêm {{ config('library_loan.renewal_days') }} ngày?')"
                                 >
                                     @csrf
 
@@ -172,7 +172,7 @@
                                         type="submit"
                                         class="btn btn-sm btn-outline-primary"
                                     >
-                                        Gia hạn 7 ngày
+                                        Gia hạn {{ config('library_loan.renewal_days') }} ngày
                                     </button>
                                 </form>
 

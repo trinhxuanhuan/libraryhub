@@ -8,12 +8,19 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Cập nhật trạng thái phiếu quá hạn lúc 00:05
 Schedule::command('loans:mark-overdue')
     ->dailyAt('00:05')
     ->timezone('Asia/Ho_Chi_Minh')
     ->withoutOverlapping();
 
-// Gửi email nhắc trả lúc 08:00
+// Gửi email nhắc trước hạn lúc 08:00
+Schedule::command('loans:send-due-soon-reminders')
+    ->dailyAt('08:00')
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping();
+
+// Gửi email nhắc quá hạn lúc 08:00
 Schedule::command('loans:send-overdue-reminders')
     ->dailyAt('08:00')
     ->timezone('Asia/Ho_Chi_Minh')
