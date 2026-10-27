@@ -3,12 +3,17 @@
 namespace Tests\Feature\Console;
 
 use App\Enums\UserRole;
+use App\Events\LoanOverdueReminderRequested;
+use App\Listeners\SendOverdueLoanReminder;
 use App\Mail\OverdueLoanReminder;
 use App\Models\Loan;
 use App\Models\User;
+use Illuminate\Events\CallQueuedListener;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -22,8 +27,15 @@ class SendOverdueLoanRemindersTest extends TestCase
     {
         parent::setUp();
 
-        $this->travelTo(Carbon::parse('2026-10-25 12:00:00'));
+        // Chạy Queue đồng bộ trong các test thông thường
+        config()->set('queue.default', 'sync');
 
+        // Cố định thời gian kiểm thử
+        $this->travelTo(
+            Carbon::parse('2026-10-25 12:00:00')
+        );
+
+        // Không gửi email thật
         Mail::fake();
 
         $this->member = User::factory()->create([
@@ -93,9 +105,17 @@ class SendOverdueLoanRemindersTest extends TestCase
 
         Mail::assertNothingSent();
 
-        $this->assertNull($future->fresh()->overdue_reminder_sent_at);
-        $this->assertNull($pending->fresh()->overdue_reminder_sent_at);
-        $this->assertNull($returned->fresh()->overdue_reminder_sent_at);
+        $this->assertNull(
+            $future->fresh()->overdue_reminder_sent_at
+        );
+
+        $this->assertNull(
+            $pending->fresh()->overdue_reminder_sent_at
+        );
+
+        $this->assertNull(
+            $returned->fresh()->overdue_reminder_sent_at
+        );
     }
 
     public function test_command_does_not_send_same_reminder_twice(): void
@@ -118,7 +138,10 @@ class SendOverdueLoanRemindersTest extends TestCase
         $this->artisan('loans:send-overdue-reminders')
             ->assertExitCode(0);
 
-        Mail::assertSentTimes(OverdueLoanReminder::class, 1);
+        Mail::assertSentTimes(
+            OverdueLoanReminder::class,
+            1
+        );
 
         $this->assertSame(
             $firstSentAt,
@@ -168,7 +191,9 @@ class SendOverdueLoanRemindersTest extends TestCase
 
         Mail::shouldReceive('to')
             ->once()
-            ->andThrow(new RuntimeException('Simulated mail failure'));
+            ->andThrow(
+                new RuntimeException('Simulated mail failure')
+            );
 
         $this->artisan('loans:send-overdue-reminders')
             ->assertExitCode(1);
@@ -196,5 +221,119 @@ class SendOverdueLoanRemindersTest extends TestCase
             'Thông báo sách mượn quá hạn',
             $html
         );
+    }
+
+    public function test_command_dispatches_expected_event(): void
+    {
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->subDay()
+        );
+
+        // Chặn Event để kiểm tra riêng Command
+        Event::fake([
+            LoanOverdueReminderRequested::class,
+        ]);
+
+        $this->artisan('loans:send-overdue-reminders')
+            ->assertExitCode(0);
+
+        Event::assertDispatched(
+            LoanOverdueReminderRequested::class,
+            function (LoanOverdueReminderRequested $event) use ($loan) {
+                return $event->loanId === $loan->id;
+            }
+        );
+
+        Mail::assertNothingSent();
+
+        $this->assertNull(
+            $loan->fresh()->overdue_reminder_sent_at
+        );
+    }
+
+    public function test_listener_sends_mail_when_event_is_dispatched(): void
+    {
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->subDay()
+        );
+
+        LoanOverdueReminderRequested::dispatch($loan->id);
+
+        Mail::assertSentTimes(
+            OverdueLoanReminder::class,
+            1
+        );
+
+        $this->assertNotNull(
+            $loan->fresh()->overdue_reminder_sent_at
+        );
+    }
+
+    public function test_command_pushes_listener_to_queue(): void
+    {
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->subDay()
+        );
+
+        // Chặn Queue, không thực thi Job
+        Queue::fake();
+
+        $this->artisan('loans:send-overdue-reminders')
+            ->assertExitCode(0);
+
+        Queue::assertPushed(
+            CallQueuedListener::class,
+            function (CallQueuedListener $job) use ($loan) {
+                return $job->class === SendOverdueLoanReminder::class
+                    && ($job->data[0] ?? null)
+                        instanceof LoanOverdueReminderRequested
+                    && $job->data[0]->loanId === $loan->id;
+            }
+        );
+
+        // Job chưa chạy nên chưa có email
+        Mail::assertNothingSent();
+
+        // Chưa gửi email thì chưa được đánh dấu
+        $this->assertNull(
+            $loan->fresh()->overdue_reminder_sent_at
+        );
+    }
+
+    public function test_listener_rechecks_loan_before_sending(): void
+    {
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->subDay()
+        );
+
+        // Giả sử phiếu đã được trả trước khi Worker xử lý
+        $loan->update([
+            'status' => 'returned',
+        ]);
+
+        LoanOverdueReminderRequested::dispatch($loan->id);
+
+        Mail::assertNothingSent();
+
+        $this->assertNull(
+            $loan->fresh()->overdue_reminder_sent_at
+        );
+    }
+
+    public function test_listener_has_retry_configuration(): void
+    {
+        $listener = app(SendOverdueLoanReminder::class);
+
+        $this->assertSame(3, $listener->tries);
+
+        $this->assertSame(60, $listener->backoff);
     }
 }
