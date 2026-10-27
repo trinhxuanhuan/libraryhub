@@ -8,10 +8,10 @@
             <h1 class="h3 mb-3">Sửa sách</h1>
 
             <form method="POST"
-                  action="{{ route('admin.books.update', $book) }}">
+                  action="{{ route('admin.books.update', $book) }}"
+                  enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
-
                 @include('admin.books._form')
 
                 <button type="submit" class="btn btn-primary">

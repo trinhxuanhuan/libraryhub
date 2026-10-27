@@ -1,0 +1,1055 @@
+<?php
+
+namespace Tests\Feature\Management;
+
+use App\Enums\BookCopyStatus;
+use App\Enums\UserRole;
+use App\Models\Book;
+use App\Models\Category;
+use App\Models\Loan;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Tests\TestCase;
+
+class LoanManagementTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $librarian;
+
+    private User $member;
+
+    private Category $category;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->librarian = User::factory()->create();
+        $this->librarian->forceFill([
+            'role' => UserRole::Librarian,
+            'is_active' => true,
+        ])->save();
+
+        $this->member = User::factory()->create();
+        $this->member->forceFill([
+            'role' => UserRole::Member,
+            'is_active' => true,
+        ])->save();
+
+        $this->withSession([
+            'manual_auth_user_id' => $this->librarian->id,
+        ]);
+
+        $this->category = Category::create([
+            'name' => 'Thể loại kiểm thử',
+            'description' => 'Dữ liệu dùng cho Feature Test',
+        ]);
+    }
+
+    private function createBookWithCopy(): array
+    {
+        $book = Book::factory()->create([
+            'category_id' => $this->category->id,
+            'cover_path' => null,
+            'total_copies' => 1,
+            'available_copies' => 1,
+        ]);
+
+        $copy = $book->copies()->create([
+            'barcode' => sprintf(
+                'TEST-%06d-0001',
+                $book->id
+            ),
+            'status' => BookCopyStatus::Available->value,
+        ]);
+
+        return [$book, $copy];
+    }
+
+    private function createPendingLoan(Book ...$books): Loan
+    {
+        $loan = Loan::create([
+            'user_id' => $this->member->id,
+            'status' => 'pending',
+        ]);
+
+        foreach ($books as $book) {
+            $loan->items()->create([
+                'book_id' => $book->id,
+                'book_copy_id' => null,
+            ]);
+        }
+
+        return $loan;
+    }
+
+    public function test_librarian_can_view_loan_details(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book);
+
+        $this->get(route('management.loans.index'))
+            ->assertOk();
+
+        $this->get(route('management.loans.show', $loan))
+            ->assertOk()
+            ->assertSeeText($book->title)
+            ->assertSeeText($this->member->name);
+    }
+
+    public function test_librarian_can_issue_multiple_books(): void
+    {
+        [$book1, $copy1] = $this->createBookWithCopy();
+        [$book2, $copy2] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book1, $book2);
+
+        $items = $loan->items()->orderBy('id')->get();
+
+        $this->post(
+            route('management.loans.issue', $loan),
+            [
+                'copies' => [
+                    $items[0]->id => $copy1->id,
+                    $items[1]->id => $copy2->id,
+                ],
+            ]
+        )
+            ->assertRedirect(route('management.loans.show', $loan))
+            ->assertSessionHasNoErrors();
+
+        $loan->refresh();
+
+        $this->assertSame('borrowed', $loan->status);
+        $this->assertSame(
+            $this->librarian->id,
+            $loan->issued_by
+        );
+
+        $this->assertNotNull($loan->borrowed_at);
+        $this->assertNotNull($loan->due_at);
+
+        $this->assertDatabaseHas('loan_items', [
+            'id' => $items[0]->id,
+            'book_copy_id' => $copy1->id,
+        ]);
+
+        $this->assertDatabaseHas('loan_items', [
+            'id' => $items[1]->id,
+            'book_copy_id' => $copy2->id,
+        ]);
+
+        $this->assertDatabaseHas('book_copies', [
+            'id' => $copy1->id,
+            'status' => BookCopyStatus::Borrowed->value,
+        ]);
+
+        $this->assertDatabaseHas('book_copies', [
+            'id' => $copy2->id,
+            'status' => BookCopyStatus::Borrowed->value,
+        ]);
+
+        $this->assertSame(
+            0,
+            (int) $book1->fresh()->available_copies
+        );
+
+        $this->assertSame(
+            0,
+            (int) $book2->fresh()->available_copies
+        );
+    }
+
+    public function test_librarian_can_reject_pending_loan(): void
+    {
+        [$book, $copy] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book);
+
+        $this->post(route('management.loans.reject', $loan))
+            ->assertRedirect(route('management.loans.show', $loan))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('rejected', $loan->fresh()->status);
+
+        $this->assertSame(
+            1,
+            (int) $book->fresh()->available_copies
+        );
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+    }
+
+    public function test_returning_books_updates_loan_status(): void
+    {
+        [$book1, $copy1] = $this->createBookWithCopy();
+        [$book2, $copy2] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book1, $book2);
+
+        $items = $loan->items()->orderBy('id')->get();
+
+        $this->post(
+            route('management.loans.issue', $loan),
+            [
+                'copies' => [
+                    $items[0]->id => $copy1->id,
+                    $items[1]->id => $copy2->id,
+                ],
+            ]
+        )->assertSessionHasNoErrors();
+
+        // Trả bản sách thứ nhất
+        $this->post(route(
+            'management.loans.items.return',
+            [$loan, $items[0]]
+        ))->assertSessionHasNoErrors();
+
+        // Loan vẫn borrowed vì còn một bản chưa trả
+        $this->assertSame('borrowed', $loan->fresh()->status);
+
+        $this->assertNotNull($items[0]->fresh()->returned_at);
+        $this->assertNull($items[1]->fresh()->returned_at);
+
+        $this->assertSame(
+            1,
+            (int) $book1->fresh()->available_copies
+        );
+
+        $this->assertSame(
+            0,
+            (int) $book2->fresh()->available_copies
+        );
+
+        // Trả bản sách thứ hai
+        $this->post(route(
+            'management.loans.items.return',
+            [$loan, $items[1]]
+        ))->assertSessionHasNoErrors();
+
+        // Trả đủ sách thì Loan mới hoàn thành
+        $this->assertSame('returned', $loan->fresh()->status);
+        $this->assertNotNull($loan->fresh()->returned_at);
+
+        $this->assertSame(
+            1,
+            (int) $book2->fresh()->available_copies
+        );
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy1->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy2->fresh()->getRawOriginal('status')
+        );
+    }
+
+    public function test_librarian_cannot_issue_same_loan_twice(): void
+    {
+        [$book, $copy] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book);
+        $item = $loan->items()->firstOrFail();
+
+        $data = [
+            'copies' => [
+                $item->id => $copy->id,
+            ],
+        ];
+
+        // Lần giao thứ nhất thành công
+        $this->post(route('management.loans.issue', $loan), $data)
+            ->assertSessionHasNoErrors();
+
+        // Không được giao lại phiếu đang borrowed
+        $this->post(route('management.loans.issue', $loan), $data)
+            ->assertSessionHasErrors('loan');
+
+        $this->assertSame('borrowed', $loan->fresh()->status);
+
+        $this->assertSame(
+            0,
+            (int) $book->fresh()->available_copies
+        );
+    }
+
+    public function test_librarian_cannot_issue_wrong_book_copy(): void
+    {
+        [$book1] = $this->createBookWithCopy();
+        [$book2, $copy2] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book1);
+        $item = $loan->items()->firstOrFail();
+
+        // Cố giao bản vật lý của Book 2 cho Book 1
+        $this->post(
+            route('management.loans.issue', $loan),
+            [
+                'copies' => [
+                    $item->id => $copy2->id,
+                ],
+            ]
+        )->assertSessionHasErrors('copies');
+
+        $this->assertSame('pending', $loan->fresh()->status);
+
+        $this->assertNull($item->fresh()->book_copy_id);
+
+        $this->assertSame(
+            1,
+            (int) $book1->fresh()->available_copies
+        );
+
+        $this->assertSame(
+            1,
+            (int) $book2->fresh()->available_copies
+        );
+    }
+
+    public function test_librarian_cannot_return_same_item_twice(): void
+    {
+        [$book, $copy] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book);
+        $item = $loan->items()->firstOrFail();
+
+        $this->post(
+            route('management.loans.issue', $loan),
+            [
+                'copies' => [
+                    $item->id => $copy->id,
+                ],
+            ]
+        )->assertSessionHasNoErrors();
+
+        // Lần trả thứ nhất
+        $this->post(route(
+            'management.loans.items.return',
+            [$loan, $item]
+        ))->assertSessionHasNoErrors();
+
+        // Lần trả thứ hai phải bị từ chối
+        $this->post(route(
+            'management.loans.items.return',
+            [$loan, $item]
+        ))->assertSessionHasErrors('loan');
+
+        $this->assertSame('returned', $loan->fresh()->status);
+
+        // Không được tăng số lượng sách lên 2
+        $this->assertSame(
+            1,
+            (int) $book->fresh()->available_copies
+        );
+    }
+
+    public function test_member_cannot_access_librarian_routes(): void
+    {
+        $this->withSession([
+            'manual_auth_user_id' => $this->member->id,
+        ]);
+
+        $this->get(route('management.loans.index'))
+            ->assertForbidden();
+    }
+
+    public function test_issue_loan_rolls_back_when_one_copy_is_unavailable(): void
+    {
+        // Chuẩn bị hai đầu sách, mỗi đầu sách có một bản vật lý
+        [$book1, $copy1] = $this->createBookWithCopy();
+        [$book2, $copy2] = $this->createBookWithCopy();
+
+        // Tạo phiếu yêu cầu mượn cả hai sách
+        $loan = $this->createPendingLoan($book1, $book2);
+
+        $items = $loan->items()
+            ->orderBy('book_id')
+            ->get();
+
+        // Giả lập bản sách thứ hai không còn khả dụng
+        $copy2->update([
+            'status' => BookCopyStatus::Unverified->value,
+        ]);
+
+        $book2->update([
+            'available_copies' => 0,
+        ]);
+
+        // Librarian cố giao cả hai bản sách
+        $this->post(
+            route('management.loans.issue', $loan),
+            [
+                'copies' => [
+                    $items[0]->id => $copy1->id,
+                    $items[1]->id => $copy2->id,
+                ],
+            ]
+        )->assertSessionHasErrors('copies');
+
+        // Phiếu vẫn đang chờ xử lý
+        $this->assertSame('pending', $loan->fresh()->status);
+
+        // BookCopy thứ nhất phải được rollback về Available
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy1->fresh()->getRawOriginal('status')
+        );
+
+        // Số lượng sách thứ nhất không được giảm
+        $this->assertSame(
+            1,
+            (int) $book1->fresh()->available_copies
+        );
+
+        // Số lượng sách thứ hai vẫn bằng 0
+        $this->assertSame(
+            0,
+            (int) $book2->fresh()->available_copies
+        );
+
+        // Không LoanItem nào được ghi nhận là đã giao
+        foreach ($items as $item) {
+            $this->assertNull($item->fresh()->book_copy_id);
+        }
+
+        // Không ghi nhận ngày giao hoặc người giao
+        $this->assertNull($loan->fresh()->borrowed_at);
+        $this->assertNull($loan->fresh()->issued_by);
+    }
+
+    public function test_librarian_can_search_loans_by_member_email(): void
+    {
+        [$book1] = $this->createBookWithCopy();
+        [$book2] = $this->createBookWithCopy();
+
+        $loan1 = $this->createPendingLoan($book1);
+
+        $otherMember = User::factory()->create([
+            'name' => 'Other Test Member',
+            'email' => 'other.member@example.test',
+        ]);
+
+        $loan2 = Loan::create([
+            'user_id' => $otherMember->id,
+            'status' => 'pending',
+        ]);
+
+        $loan2->items()->create([
+            'book_id' => $book2->id,
+            'book_copy_id' => null,
+        ]);
+
+        $this->get(route('management.loans.index', [
+            'search' => $this->member->email,
+        ]))
+            ->assertOk()
+            ->assertSeeText('#'.$loan1->id)
+            ->assertDontSeeText('#'.$loan2->id);
+    }
+
+    public function test_librarian_can_filter_overdue_loans(): void
+    {
+        [$book1] = $this->createBookWithCopy();
+        [$book2] = $this->createBookWithCopy();
+
+        $overdueLoan = $this->createPendingLoan($book1);
+        $normalLoan = $this->createPendingLoan($book2);
+
+        $overdueLoan->update([
+            'status' => 'borrowed',
+            'due_at' => now()->subDay(),
+        ]);
+
+        $normalLoan->update([
+            'status' => 'borrowed',
+            'due_at' => now()->addDays(7),
+        ]);
+
+        $this->get(route('management.loans.index', [
+            'status' => 'overdue',
+        ]))
+            ->assertOk()
+            ->assertSeeText('#'.$overdueLoan->id)
+            ->assertDontSeeText('#'.$normalLoan->id);
+    }
+
+    public function test_librarian_can_filter_loans_by_request_date(): void
+    {
+        [$book1] = $this->createBookWithCopy();
+        [$book2] = $this->createBookWithCopy();
+
+        $oldLoan = $this->createPendingLoan($book1);
+        $newLoan = $this->createPendingLoan($book2);
+
+        $oldLoan->forceFill([
+            'created_at' => now()->subDays(10),
+        ])->saveQuietly();
+
+        $this->get(route('management.loans.index', [
+            'from_date' => now()->subDays(2)->toDateString(),
+            'to_date' => now()->toDateString(),
+        ]))
+            ->assertOk()
+            ->assertSeeText('#'.$newLoan->id)
+            ->assertDontSeeText('#'.$oldLoan->id);
+    }
+
+    public function test_librarian_cannot_filter_with_invalid_date_range(): void
+    {
+        $this->get(route('management.loans.index', [
+            'from_date' => '2026-10-25',
+            'to_date' => '2026-10-20',
+        ]))
+            ->assertRedirect()
+            ->assertSessionHasErrors('to_date');
+    }
+
+    public function test_admin_can_view_and_issue_loan(): void
+    {
+        $admin = User::factory()->create();
+
+        $admin->forceFill([
+            'role' => UserRole::Admin,
+            'is_active' => true,
+        ])->save();
+
+        // Giả lập Admin đã đăng nhập
+        $this->withSession([
+            'manual_auth_user_id' => $admin->id,
+        ]);
+
+        [$book, $copy] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book);
+
+        $item = $loan->items()->firstOrFail();
+
+        // Admin được truy cập danh sách
+        $this->get(route('management.loans.index'))
+            ->assertOk();
+
+        // Admin được xem chi tiết
+        $this->get(route('management.loans.show', $loan))
+            ->assertOk();
+
+        // Admin được duyệt và giao sách
+        $this->post(
+            route('management.loans.issue', $loan),
+            [
+                'copies' => [
+                    $item->id => $copy->id,
+                ],
+            ]
+        )
+            ->assertRedirect(route('management.loans.show', $loan))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('borrowed', $loan->fresh()->status);
+
+        $this->assertSame(
+            $admin->id,
+            $loan->fresh()->issued_by
+        );
+    }
+
+    public function test_member_cannot_issue_loan(): void
+    {
+        [$book, $copy] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book);
+
+        $item = $loan->items()->firstOrFail();
+
+        // Đăng nhập bằng Member
+        $this->withSession([
+            'manual_auth_user_id' => $this->member->id,
+        ]);
+
+        $this->post(
+            route('management.loans.issue', $loan),
+            [
+                'copies' => [
+                    $item->id => $copy->id,
+                ],
+            ]
+        )->assertForbidden();
+
+        // Phiếu không được thay đổi
+        $this->assertSame('pending', $loan->fresh()->status);
+
+        // Tồn kho không được giảm
+        $this->assertSame(
+            1,
+            (int) $book->fresh()->available_copies
+        );
+    }
+
+    private function createBorrowedLoanForReturn(): array
+    {
+        [$book, $copy] = $this->createBookWithCopy();
+
+        $loan = $this->createPendingLoan($book);
+        $item = $loan->items()->firstOrFail();
+
+        $this->post(route('management.loans.issue', $loan), [
+            'copies' => [
+                $item->id => $copy->id,
+            ],
+        ])->assertSessionHasNoErrors();
+
+        return [$loan, $book, $copy, $item];
+    }
+
+    // 1. Trả sách đúng hạn, không phát sinh phí
+    public function test_normal_return_has_no_fine(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('management.loans.items.return', [$loan, $item]),
+            ['condition' => 'normal']
+        )->assertSessionHasNoErrors();
+
+        $this->assertSame('returned', $loan->fresh()->status);
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(1, (int) $book->fresh()->available_copies);
+
+        $this->assertNotNull($item->fresh()->returned_at);
+        $this->assertNotNull($item->fresh()->resolved_at);
+
+        $this->assertSame(
+            0,
+            (int) $item->fresh()->overdue_fine_amount
+        );
+
+        $this->assertSame(
+            0,
+            (int) $item->fresh()->compensation_amount
+        );
+    }
+
+    // 2. Trả quá hạn, tính tiền phạt
+    public function test_overdue_return_calculates_fine(): void
+    {
+        $this->travelTo(
+            Carbon::parse('2026-10-25 12:00:00')
+        );
+
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        // Quá hạn 2 ngày và 1 phút: làm tròn thành 3 ngày
+        $loan->update([
+            'due_at' => now()->subDays(2)->subMinute(),
+        ]);
+
+        $this->post(
+            route('management.loans.items.return', [$loan, $item]),
+            ['condition' => 'normal']
+        )->assertSessionHasNoErrors();
+
+        $expectedFine = 3 * (int) config(
+            'library_loan.overdue_fine_per_day'
+        );
+
+        $this->assertSame(
+            $expectedFine,
+            (int) $item->fresh()->overdue_fine_amount
+        );
+
+        $this->assertNull($item->fresh()->fine_paid_at);
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(1, (int) $book->fresh()->available_copies);
+    }
+
+    // 3. Sách bị hỏng, không được đưa vào kho khả dụng
+    public function test_damaged_return_does_not_increase_available_copies(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('management.loans.items.return', [$loan, $item]),
+            [
+                'condition' => 'damaged',
+                'note' => 'Bìa sách bị rách',
+            ]
+        )->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            BookCopyStatus::Damaged->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(0, (int) $book->fresh()->available_copies);
+
+        $this->assertNotNull($item->fresh()->returned_at);
+        $this->assertNotNull($item->fresh()->resolved_at);
+
+        $this->assertSame(
+            (int) config('library_loan.damaged_compensation'),
+            (int) $item->fresh()->compensation_amount
+        );
+
+        $this->assertSame(
+            'Bìa sách bị rách',
+            $item->fresh()->return_note
+        );
+    }
+
+    // 4. Xác nhận sách mất
+    public function test_lost_book_is_resolved_but_not_returned(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('management.loans.items.return', [$loan, $item]),
+            [
+                'condition' => 'lost',
+                'note' => 'Thành viên báo mất sách',
+            ]
+        )->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            BookCopyStatus::Lost->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(0, (int) $book->fresh()->available_copies);
+
+        $this->assertNull($item->fresh()->returned_at);
+        $this->assertNotNull($item->fresh()->resolved_at);
+
+        $this->assertSame(
+            (int) config('library_loan.lost_compensation'),
+            (int) $item->fresh()->compensation_amount
+        );
+
+        // Phiếu đã đóng vì bản sách mất đã được xử lý
+        $this->assertSame('returned', $loan->fresh()->status);
+    }
+
+    // 5. Không được xử lý một bản sách hai lần
+    public function test_resolved_book_cannot_be_processed_twice(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $url = route('management.loans.items.return', [$loan, $item]);
+
+        $this->post($url, [
+            'condition' => 'lost',
+        ])->assertSessionHasNoErrors();
+
+        $this->post($url, [
+            'condition' => 'normal',
+        ])->assertSessionHasErrors('loan');
+
+        $this->assertSame(
+            BookCopyStatus::Lost->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(0, (int) $book->fresh()->available_copies);
+        $this->assertSame('returned', $loan->fresh()->status);
+    }
+
+    // 6. Không chấp nhận tình trạng sách không hợp lệ
+    public function test_invalid_return_condition_is_rejected(): void
+    {
+        [$loan, $book, $copy, $item] =
+            $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('management.loans.items.return', [$loan, $item]),
+            ['condition' => 'unknown']
+        )->assertSessionHasErrors('condition');
+
+        $this->assertSame('borrowed', $loan->fresh()->status);
+
+        $this->assertNull($item->fresh()->resolved_at);
+
+        $this->assertSame(
+            BookCopyStatus::Borrowed->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(0, (int) $book->fresh()->available_copies);
+    }
+
+    // Librarian có thể xác nhận thu tiền phạt
+    public function test_librarian_can_confirm_fine_payment(): void
+    {
+        [$loan, , , $item] = $this->createBorrowedLoanForReturn();
+
+        // Trả sách trong tình trạng bị hỏng để phát sinh phí
+        $this->post(
+            route('management.loans.items.return', [$loan, $item]),
+            ['condition' => 'damaged']
+        )->assertSessionHasNoErrors();
+
+        $this->assertNull($item->fresh()->fine_paid_at);
+
+        $this->post(
+            route('management.loans.items.confirm-payment', [$loan, $item])
+        )
+            ->assertRedirect(route('management.loans.show', $loan))
+            ->assertSessionHasNoErrors();
+
+        $this->assertNotNull($item->fresh()->fine_paid_at);
+    }
+
+    // Không thể xác nhận thanh toán hai lần
+    public function test_librarian_cannot_confirm_payment_twice(): void
+    {
+        [$loan, , , $item] = $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('management.loans.items.return', [$loan, $item]),
+            ['condition' => 'damaged']
+        )->assertSessionHasNoErrors();
+
+        $url = route(
+            'management.loans.items.confirm-payment',
+            [$loan, $item]
+        );
+
+        $this->post($url)->assertSessionHasNoErrors();
+
+        $paidAt = $item->fresh()->fine_paid_at->toDateTimeString();
+
+        $this->post($url)->assertSessionHasErrors('fine');
+
+        $this->assertSame(
+            $paidAt,
+            $item->fresh()->fine_paid_at->toDateTimeString()
+        );
+    }
+
+    // Không được thu tiền khi không phát sinh phí
+    public function test_librarian_cannot_confirm_zero_fine(): void
+    {
+        [$loan, , , $item] = $this->createBorrowedLoanForReturn();
+
+        // Trả sách đúng hạn và bình thường
+        $this->post(
+            route('management.loans.items.return', [$loan, $item]),
+            ['condition' => 'normal']
+        )->assertSessionHasNoErrors();
+
+        $this->post(
+            route('management.loans.items.confirm-payment', [$loan, $item])
+        )->assertSessionHasErrors('fine');
+
+        $this->assertNull($item->fresh()->fine_paid_at);
+    }
+
+    // Member không được xác nhận thanh toán
+    public function test_member_cannot_confirm_fine_payment(): void
+    {
+        [$loan, , , $item] = $this->createBorrowedLoanForReturn();
+
+        $this->post(
+            route('management.loans.items.return', [$loan, $item]),
+            ['condition' => 'damaged']
+        )->assertSessionHasNoErrors();
+
+        // Chuyển sang Session của Member
+        $this->withSession([
+            'manual_auth_user_id' => $this->member->id,
+        ]);
+
+        $this->post(
+            route('management.loans.items.confirm-payment', [$loan, $item])
+        )->assertForbidden();
+
+        $this->assertNull($item->fresh()->fine_paid_at);
+    }
+
+    public function test_librarian_can_open_create_loan_page(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $this->get(route('management.loans.create'))
+            ->assertOk()
+            ->assertSeeText($this->member->name)
+            ->assertSeeText($book->title);
+    }
+
+    public function test_librarian_can_create_loan_for_member(): void
+    {
+        [$book1, $copy1] = $this->createBookWithCopy();
+        [$book2, $copy2] = $this->createBookWithCopy();
+
+        $response = $this->post(
+            route('management.loans.store'),
+            [
+                'member_id' => $this->member->id,
+                'book_ids' => [
+                    $book1->id,
+                    $book2->id,
+                ],
+            ]
+        );
+
+        $response->assertSessionHasNoErrors();
+
+        $loan = Loan::query()
+            ->where('user_id', $this->member->id)
+            ->latest('id')
+            ->firstOrFail();
+
+        $response->assertRedirect(
+            route('management.loans.show', $loan)
+        );
+
+        $this->assertSame('pending', $loan->status);
+        $this->assertCount(2, $loan->items);
+
+        foreach ($loan->items as $item) {
+            $this->assertNull($item->book_copy_id);
+        }
+
+        // Tạo phiếu chưa làm giảm tồn kho
+        $this->assertSame(
+            1,
+            (int) $book1->fresh()->available_copies
+        );
+
+        $this->assertSame(
+            1,
+            (int) $book2->fresh()->available_copies
+        );
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy1->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy2->fresh()->getRawOriginal('status')
+        );
+    }
+
+    public function test_librarian_cannot_create_loan_for_staff(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $this->post(
+            route('management.loans.store'),
+            [
+                'member_id' => $this->librarian->id,
+                'book_ids' => [$book->id],
+            ]
+        )->assertSessionHasErrors('member_id');
+
+        $this->assertDatabaseCount('loans', 0);
+    }
+
+    public function test_librarian_cannot_create_loan_for_inactive_member(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $inactiveMember = User::factory()->create();
+
+        $inactiveMember->forceFill([
+            'role' => UserRole::Member,
+            'is_active' => false,
+        ])->save();
+
+        $this->post(
+            route('management.loans.store'),
+            [
+                'member_id' => $inactiveMember->id,
+                'book_ids' => [$book->id],
+            ]
+        )->assertSessionHasErrors('member_id');
+
+        $this->assertDatabaseCount('loans', 0);
+    }
+
+    public function test_librarian_cannot_create_loan_with_duplicate_books(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $this->post(
+            route('management.loans.store'),
+            [
+                'member_id' => $this->member->id,
+                'book_ids' => [
+                    $book->id,
+                    $book->id,
+                ],
+            ]
+        )->assertSessionHasErrors();
+
+        $this->assertDatabaseCount('loans', 0);
+    }
+
+    public function test_librarian_cannot_create_loan_with_unavailable_book(): void
+    {
+        [$book, $copy] = $this->createBookWithCopy();
+
+        $copy->update([
+            'status' => BookCopyStatus::Unverified->value,
+        ]);
+
+        $book->update([
+            'available_copies' => 0,
+        ]);
+
+        $this->post(
+            route('management.loans.store'),
+            [
+                'member_id' => $this->member->id,
+                'book_ids' => [$book->id],
+            ]
+        )->assertSessionHasErrors('book_ids');
+
+        $this->assertDatabaseCount('loans', 0);
+    }
+
+    public function test_member_cannot_create_loan_as_librarian(): void
+    {
+        $this->withSession([
+            'manual_auth_user_id' => $this->member->id,
+        ]);
+
+        [$book] = $this->createBookWithCopy();
+
+        $this->get(route('management.loans.create'))
+            ->assertForbidden();
+
+        $this->post(
+            route('management.loans.store'),
+            [
+                'member_id' => $this->member->id,
+                'book_ids' => [$book->id],
+            ]
+        )->assertForbidden();
+
+        $this->assertDatabaseCount('loans', 0);
+    }
+}

@@ -10,9 +10,12 @@ use App\Http\Requests\UpdateBookRequest;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Category;
+use App\Models\Loan;
+use App\Services\BookRetirementService;
+use App\Services\BookService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class BookController extends Controller
@@ -60,18 +63,14 @@ class BookController extends Controller
         ]);
     }
 
-    public function store(StoreBookRequest $request): RedirectResponse
-    {
-        $data = $request->validated();
-
-        $authorIds = $data['author_ids'];
-        unset($data['author_ids']);
-
-        DB::transaction(function () use ($data, $authorIds) {
-            $book = Book::create($data);
-
-            $book->authors()->sync($authorIds);
-        });
+    public function store(
+        StoreBookRequest $request,
+        BookService $bookService
+    ): RedirectResponse {
+        $bookService->create(
+            $request->validated(),
+            $request->file('cover')
+        );
 
         return redirect()
             ->route('admin.books.index')
@@ -91,30 +90,45 @@ class BookController extends Controller
 
     public function update(
         UpdateBookRequest $request,
-        Book $book
+        Book $book,
+        BookService $bookService
     ): RedirectResponse {
-        $data = $request->validated();
-
-        $authorIds = $data['author_ids'];
-        unset($data['author_ids']);
-
-        DB::transaction(function () use ($book, $data, $authorIds) {
-            $book->update($data);
-
-            $book->authors()->sync($authorIds);
-        });
+        $bookService->update(
+            $book,
+            $request->validated(),
+            $request->file('cover')
+        );
 
         return redirect()
             ->route('admin.books.index')
             ->with('success', __('message.books.updated'));
     }
 
-    public function destroy(Book $book): RedirectResponse
-    {
-        $book->delete();
+    public function destroy(
+        Book $book,
+        BookRetirementService $retirementService
+    ): RedirectResponse {
+        $rejectedCount = $retirementService->retire($book);
 
         return redirect()
             ->route('admin.books.index')
-            ->with('success', __('message.books.deleted'));
+            ->with('success', __('message.books.retired', [
+                'count' => $rejectedCount,
+            ]));
+    }
+
+    public function retire(Book $book): View
+    {
+        $pendingLoansCount = Loan::query()
+            ->where('status', 'pending')
+            ->whereHas('items', function (Builder $query) use ($book) {
+                $query->where('book_id', $book->id);
+            })
+            ->count();
+
+        return view('admin.books.retire', compact(
+            'book',
+            'pendingLoansCount'
+        ));
     }
 }

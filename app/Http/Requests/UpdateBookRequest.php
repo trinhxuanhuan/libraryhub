@@ -21,6 +21,8 @@ class UpdateBookRequest extends StoreBookRequest
             Rule::unique('books', 'isbn')->ignore($book),
         ];
 
+        unset($rules['available_copies']);
+
         return $rules;
     }
 }

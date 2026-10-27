@@ -14,8 +14,11 @@
         @csrf
         @method('DELETE')
 
-        <button type="submit" class="btn btn-danger btn-sm">
-            Xóa
-        </button>
+        <a
+            href="{{ route('admin.books.retire', $book) }}"
+            class="btn btn-outline-danger btn-sm"
+        >
+            Ngừng cung cấp
+        </a>
     </form>
 </div>
