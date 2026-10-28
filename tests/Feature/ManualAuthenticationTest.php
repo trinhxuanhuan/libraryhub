@@ -161,4 +161,17 @@ class ManualAuthenticationTest extends TestCase
             'password' => $password,
         ])->assertSessionHas('manual_auth_user_id', $user->id);
     }
+
+    public function test_registration_is_rate_limited(): void
+    {
+        // Gửi 5 request đăng ký với dữ liệu không hợp lệ
+        for ($i = 0; $i < 5; $i++) {
+            $this->post(route('register.store'), [])
+                ->assertSessionHasErrors();
+        }
+
+        // Request thứ 6 phải bị chặn
+        $this->post(route('register.store'), [])
+            ->assertStatus(429);
+    }
 }
