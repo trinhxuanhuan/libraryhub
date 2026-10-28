@@ -229,6 +229,10 @@
                                     <span class="badge bg-success">
                                         Đã trả
                                     </span>
+                                @elseif ($loan->status === \App\Enums\LoanStatus::Cancelled->value)
+                                    <span class="badge bg-secondary">
+                                        Đã hủy
+                                    </span>
 
                                 @elseif ($loan->status === 'rejected')
                                     <span class="badge bg-secondary">

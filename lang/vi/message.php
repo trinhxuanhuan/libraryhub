@@ -60,5 +60,8 @@ return [
         'item_processed' => 'Đã ghi nhận xử lý bản sách thành công.',
         'fine_paid' => 'Đã xác nhận thu tiền phạt thành công.',
         'created' => 'Đã tạo phiếu mượn. Hãy chọn bản sách để giao.',
+        'prioritize_earlier_requests' => 'Cần ưu tiên các phiếu yêu cầu mượn sách trước.',
+        'cannot_cancel' => 'Chỉ có thể hủy phiếu đang chờ duyệt.',
+        'cancelled' => 'Đã hủy yêu cầu mượn sách thành công.',
     ],
 ];

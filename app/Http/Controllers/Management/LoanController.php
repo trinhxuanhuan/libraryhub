@@ -106,7 +106,7 @@ class LoanController extends Controller
 
         return redirect()
             ->route('management.loans.show', $loan)
-            ->with('success', __('message.loans.management.issued'));
+            ->with('success', __('message.loans.issued'));
     }
 
     // Từ chối yêu cầu mượn
@@ -219,6 +219,6 @@ class LoanController extends Controller
 
         return redirect()
             ->route('management.loans.show', $loan)
-            ->with('success', __('message.loans.management.created'));
+            ->with('success', __('message.loans.created'));
     }
 }

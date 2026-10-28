@@ -129,6 +129,10 @@
                                 <span class="badge bg-success">
                                     Đã trả
                                 </span>
+                            @elseif ($loan->status === 'cancelled')
+                                <span class="badge bg-secondary">
+                                    Đã hủy
+                                </span>
 
                             @elseif ($loan->status === 'rejected')
                                 <span class="badge bg-secondary">
@@ -160,7 +164,24 @@
 
                         {{-- Thao tác --}}
                         <td class="text-nowrap">
-                            @if ($canRenew)
+                            @if ($loan->status === 'pending')
+                                <form
+                                    method="POST"
+                                    action="{{ route('member.loans.cancel', $loan) }}"
+                                    onsubmit="return confirm('Bạn có chắc muốn hủy yêu cầu mượn sách này?')"
+                                >
+                                    @csrf
+                                    @method('PATCH')
+
+                                    <button
+                                        type="submit"
+                                        class="btn btn-sm btn-outline-danger"
+                                    >
+                                        Hủy yêu cầu
+                                    </button>
+                                </form>
+
+                            @elseif ($canRenew)
                                 <form
                                     method="POST"
                                     action="{{ route('member.loans.renew', $loan) }}"

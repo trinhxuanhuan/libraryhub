@@ -2,6 +2,7 @@
 
 namespace App\Queries;
 
+use App\Enums\LoanStatus;
 use App\Models\Loan;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -68,6 +69,15 @@ class LoanListQuery
                     ELSE 3
                 END",
                 [now()]
+            )
+            // Phiếu pending: ưu tiên người gửi yêu cầu trước
+            ->orderByRaw(
+                'CASE WHEN status = ? THEN created_at END ASC',
+                [LoanStatus::Pending->value]
+            )
+            ->orderByRaw(
+                'CASE WHEN status = ? THEN id END ASC',
+                [LoanStatus::Pending->value]
             )
             ->latest('id')
             ->paginate(15);

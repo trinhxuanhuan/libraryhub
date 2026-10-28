@@ -52,4 +52,18 @@ class LoanController extends Controller
             ->route('member.loans.index')
             ->with('success', __('message.loans.renewed'));
     }
+    public function cancel(
+        Request $request,
+        Loan $loan,
+        LoanService $loanService
+    ): RedirectResponse {
+        $memberId = (int) $request->session()
+            ->get('manual_auth_user_id');
+
+        $loanService->cancelLoan($loan->id, $memberId);
+
+        return redirect()
+            ->route('member.loans.index')
+            ->with('success', __('message.loans.cancelled'));
+    }
 }
