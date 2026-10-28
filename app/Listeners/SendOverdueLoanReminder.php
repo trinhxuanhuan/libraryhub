@@ -9,6 +9,7 @@ use App\Models\Loan;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -53,6 +54,22 @@ class SendOverdueLoanReminder implements ShouldQueue
         $loan->forceFill([
             'overdue_reminder_sent_at' => now(),
         ])->save();
+
+        $sentAt = microtime(true);
+
+        $previousSentAt = Cache::get('overdue_last_email_sent_at');
+
+        $interval = $previousSentAt === null
+            ? null
+            : round($sentAt - (float) $previousSentAt, 3);
+
+        Log::info('Overdue email sent', [
+            'loan_id' => $loan->id,
+            'sent_at' => now()->format('Y-m-d H:i:s.u'),
+            'interval_seconds' => $interval,
+        ]);
+
+        Cache::put('overdue_last_email_sent_at', $sentAt, 86400);
     }
 
     public function failed(
