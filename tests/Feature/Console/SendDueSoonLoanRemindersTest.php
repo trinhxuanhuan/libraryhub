@@ -4,16 +4,23 @@ namespace Tests\Feature\Console;
 
 use App\Enums\UserRole;
 use App\Events\LoanDueSoonReminderRequested;
+use App\Listeners\SendDueSoonLoanReminder;
 use App\Mail\DueSoonLoanReminder;
 use App\Models\Book;
 use App\Models\Category;
 use App\Models\Loan;
 use App\Models\User;
+use Illuminate\Events\CallQueuedListener;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use RuntimeException;
+use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
 use Tests\TestCase;
 
 class SendDueSoonLoanRemindersTest extends TestCase
@@ -27,6 +34,8 @@ class SendDueSoonLoanRemindersTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Cho phép các test kiểm tra việc gửi mail chạy đồng bộ
+        config()->set('queue.default', 'sync');
 
         // Cố định thời gian kiểm thử theo giờ Việt Nam
         $this->travelTo(
@@ -103,6 +112,72 @@ class SendDueSoonLoanRemindersTest extends TestCase
 
         $this->assertNotNull(
             $loan->fresh()->due_soon_reminder_sent_at
+        );
+    }
+
+    public function test_due_soon_listener_prevents_overlapping_jobs(): void
+    {
+        // Tạo phiếu đang mượn, sắp đến hạn và có sách chưa xử lý
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->addDays(2)
+        );
+
+        $event = new LoanDueSoonReminderRequested($loan->id);
+
+        $listener = app(SendDueSoonLoanReminder::class);
+
+        // Lấy middleware khóa đồng thời
+        $middleware = $listener->middleware($event)[0];
+
+        $job = new CallQueuedListener(
+            SendDueSoonLoanReminder::class,
+            'handle',
+            [$event]
+        );
+
+        // Giả lập worker A đang giữ khóa
+        $lock = Cache::lock(
+            $middleware->getLockKey($job),
+            80
+        );
+
+        $this->assertTrue($lock->get());
+
+        try {
+            // Worker B nhận cùng yêu cầu
+            LoanDueSoonReminderRequested::dispatch($loan->id);
+
+            // Không được gửi email khi khóa đang bị giữ
+            Mail::assertNothingSent();
+
+            $this->assertNull(
+                $loan->fresh()->due_soon_reminder_sent_at
+            );
+        } finally {
+            // Giải phóng khóa kể cả khi test gặp lỗi
+            $lock->release();
+        }
+
+        // Sau khi nhả khóa, job hợp lệ được gửi
+        LoanDueSoonReminderRequested::dispatch($loan->id);
+
+        Mail::assertSentTimes(
+            DueSoonLoanReminder::class,
+            1
+        );
+
+        $this->assertNotNull(
+            $loan->fresh()->due_soon_reminder_sent_at
+        );
+
+        // Event chạy lại không được gửi email trùng
+        LoanDueSoonReminderRequested::dispatch($loan->id);
+
+        Mail::assertSentTimes(
+            DueSoonLoanReminder::class,
+            1
         );
     }
 
@@ -258,9 +333,21 @@ class SendDueSoonLoanRemindersTest extends TestCase
                 new RuntimeException('Simulated mail failure')
             );
 
-        $this->artisan('loans:send-due-soon-reminders')
-            ->assertExitCode(1);
+        // Gọi trực tiếp Listener để kiểm tra lỗi gửi mail
+        try {
+            app(SendDueSoonLoanReminder::class)->handle(
+                new LoanDueSoonReminderRequested($loan->id)
+            );
 
+            $this->fail('Expected mail sending to fail.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'Simulated mail failure',
+                $exception->getMessage()
+            );
+        }
+
+        // Gửi thất bại thì vẫn phải là NULL
         $this->assertNull(
             $loan->fresh()->due_soon_reminder_sent_at
         );
@@ -356,5 +443,233 @@ class SendDueSoonLoanRemindersTest extends TestCase
             'Sách kiểm thử nhắc trả',
             $html
         );
+    }
+
+    public function test_command_pushes_listener_to_queue(): void
+    {
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->addDay()
+        );
+
+        // Giả lập Queue, không thực thi Job
+        Queue::fake();
+
+        $this->artisan('loans:send-due-soon-reminders')
+            ->assertExitCode(0);
+
+        // Command phải tạo đúng Job cho Listener
+        Queue::assertPushed(
+            CallQueuedListener::class,
+            function (CallQueuedListener $job) use ($loan) {
+                return $job->class === SendDueSoonLoanReminder::class
+                    && ($job->data[0] ?? null)
+                        instanceof LoanDueSoonReminderRequested
+                    && $job->data[0]->loanId === $loan->id;
+            }
+        );
+
+        // Job chưa chạy thì email chưa được gửi
+        Mail::assertNothingSent();
+
+        // Chưa gửi thành công thì chưa được đánh dấu
+        $this->assertNull(
+            $loan->fresh()->due_soon_reminder_sent_at
+        );
+    }
+
+    public function test_queued_listener_is_recorded_as_failed_after_max_attempts(): void
+    {
+        // Sử dụng Database Queue thật trong môi trường test
+        config()->set('queue.default', 'database');
+        config()->set('queue.failed.driver', 'database-uuids');
+
+        // Tạo phiếu mượn sắp đến hạn
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->addDay()
+        );
+
+        // Giả lập cả 3 lần gửi email đều thất bại
+        Mail::shouldReceive('to')
+            ->times(3)
+            ->andThrow(
+                new RuntimeException('Simulated permanent mail failure')
+            );
+
+        // Phát Event, Laravel đưa Listener vào Queue
+        event(new LoanDueSoonReminderRequested($loan->id));
+
+        $this->assertDatabaseCount('jobs', 1);
+
+        // Cho Worker xử lý tối đa 3 lần
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            Artisan::call('queue:work', [
+                'connection' => 'database',
+                '--queue' => 'default',
+                '--once' => true,
+                '--sleep' => 0,
+            ]);
+
+            if ($attempt < 3) {
+                // Chưa hết lượt thử nên Job vẫn còn trong Queue
+                $this->assertDatabaseCount('jobs', 1);
+
+                // Job chưa thất bại hoàn toàn
+                $this->assertDatabaseCount('failed_jobs', 0);
+
+                // Giả lập thời gian trôi qua 61 giây
+                $this->travel(61)->seconds();
+            }
+        }
+
+        // Sau lần thứ 3, Job không còn trong hàng đợi
+        $this->assertDatabaseCount('jobs', 0);
+
+        // Job thất bại hoàn toàn được ghi nhận
+        $this->assertDatabaseHas('failed_jobs', [
+            'queue' => 'default',
+        ]);
+
+        // Không được đánh dấu đã gửi email
+        $this->assertNull(
+            $loan->fresh()->due_soon_reminder_sent_at
+        );
+    }
+
+    public function test_permanent_smtp_failure_does_not_retry(): void
+    {
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->addDays(2)
+        );
+
+        $exception = new UnexpectedResponseException(
+            'Mailbox does not exist',
+            550
+        );
+
+        Mail::shouldReceive('to')
+            ->once()
+            ->andThrow($exception);
+
+        $listener = app(SendDueSoonLoanReminder::class)
+            ->withFakeQueueInteractions();
+
+        $listener->handle(
+            new LoanDueSoonReminderRequested($loan->id)
+        );
+
+        $listener->assertFailedWith($exception);
+
+        $this->assertNull(
+            $loan->fresh()->due_soon_reminder_sent_at
+        );
+    }
+
+    public function test_temporary_smtp_failure_allows_retry(): void
+    {
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->addDays(2)
+        );
+
+        $exception = new UnexpectedResponseException(
+            'Temporary SMTP failure',
+            451
+        );
+
+        Mail::shouldReceive('to')
+            ->once()
+            ->andThrow($exception);
+
+        $listener = app(SendDueSoonLoanReminder::class)
+            ->withFakeQueueInteractions();
+
+        try {
+            $listener->handle(
+                new LoanDueSoonReminderRequested($loan->id)
+            );
+
+            $this->fail('Expected an SMTP exception.');
+        } catch (UnexpectedResponseException $caught) {
+            $this->assertSame(451, $caught->getCode());
+        }
+
+        $listener->assertNotFailed();
+
+        $this->assertNull(
+            $loan->fresh()->due_soon_reminder_sent_at
+        );
+    }
+
+    public function test_listener_logs_email_sending_duration(): void
+    {
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->addDays(2)
+        );
+
+        Log::spy();
+
+        LoanDueSoonReminderRequested::dispatch($loan->id);
+
+        Mail::assertSentTimes(DueSoonLoanReminder::class, 1);
+
+        Log::shouldHaveReceived('info')
+            ->once()
+            ->withArgs(function ($message, $context) use ($loan) {
+                return $message === 'Loan reminder mail attempt'
+                    && $context['loan_id'] === $loan->id
+                    && $context['type'] === 'due_soon'
+                    && $context['mailer'] === config('mail.default')
+                    && is_numeric($context['duration_ms'])
+                    && $context['duration_ms'] >= 0
+                    && $context['send_succeeded'] === true
+                    && ! array_key_exists('interval_seconds', $context);
+            });
+    }
+
+    public function test_logging_failure_does_not_cause_duplicate_email(): void
+    {
+        $loan = $this->createLoan(
+            $this->member,
+            'borrowed',
+            now()->addDays(2)
+        );
+
+        $listener = app(SendDueSoonLoanReminder::class);
+
+        Log::shouldReceive('info')
+            ->once()
+            ->andThrow(new RuntimeException('Simulated logging failure'));
+
+        try {
+            $listener->handle(
+                new LoanDueSoonReminderRequested($loan->id)
+            );
+
+            $this->fail('Expected logging exception was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'Simulated logging failure',
+                $exception->getMessage()
+            );
+        }
+
+        $this->assertNotNull(
+            $loan->fresh()->due_soon_reminder_sent_at
+        );
+
+        $listener->handle(
+            new LoanDueSoonReminderRequested($loan->id)
+        );
+
+        Mail::assertSentTimes(DueSoonLoanReminder::class, 1);
     }
 }
