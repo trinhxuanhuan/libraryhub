@@ -6,7 +6,7 @@ Xin chào {{ $loan->user->name }},
 LibraryHub thông báo phiếu mượn **#{{ $loan->id }}**
 của bạn đã quá hạn trả sách.
 
-**Hạn trả:** {{ $loan->due_at->format('d/m/Y H:i') }}
+**Hạn trả:** {{ $loan->due_at->copy()->setTimezone('Asia/Ho_Chi_Minh')->format('d/m/Y H:i') }}
 
 @php
     $unresolvedItems = $loan->items->whereNull('resolved_at');

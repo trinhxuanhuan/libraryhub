@@ -2,16 +2,15 @@
 
 namespace App\Listeners;
 
-use App\Enums\UserRole;
 use App\Events\LoanOverdueReminderRequested;
 use App\Mail\OverdueLoanReminder;
 use App\Models\Loan;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
 use Throwable;
 
 class SendOverdueLoanReminder implements ShouldQueue
@@ -22,54 +21,80 @@ class SendOverdueLoanReminder implements ShouldQueue
 
     public int $backoff = 60;
 
+    // Giới hạn thời gian xử lý một job
+    public int $timeout = 60;
+
+    // Không cho nhiều worker gửi email quá hạn cho cùng một phiếu mượn tại cùng thời điểm.
+    public function middleware(
+        LoanOverdueReminderRequested $event
+    ): array {
+        return [
+            (new WithoutOverlapping(
+                'loan:overdue:'.$event->loanId
+            ))
+                ->shared()
+                ->dontRelease()
+                ->expireAfter(80),
+        ];
+    }
+
     public function handle(
         LoanOverdueReminderRequested $event
     ): void {
         // Kiểm tra lại điều kiện trước khi gửi
         $loan = Loan::query()
+            ->forLoanReminder()
             ->with(['user', 'items.book'])
             ->whereKey($event->loanId)
-            ->where('status', 'borrowed')
-            ->whereNotNull('due_at')
             ->where('due_at', '<', now())
             ->whereNull('overdue_reminder_sent_at')
-            ->whereHas('user', function (Builder $query) {
-                $query
-                    ->where('role', UserRole::Member->value)
-                    ->where('is_active', true)
-                    ->whereNotNull('email')
-                    ->where('email', '!=', '');
-            })
             ->first();
 
         if ($loan === null) {
             return;
         }
 
-        // Gửi email nhắc trả quá hạn
-        Mail::to($loan->user->email)
-            ->send(new OverdueLoanReminder($loan));
+        // Bắt đầu đo thời gian gửi một email
+        $startedAt = hrtime(true);
+        $sendSucceeded = false;
+
+        try {
+            Mail::to($loan->user->email)
+                ->send(new OverdueLoanReminder($loan));
+
+            $sendSucceeded = true;
+        } catch (UnexpectedResponseException $exception) {
+            $code = $exception->getCode();
+
+            // SMTP 5xx: lỗi vĩnh viễn, không retry
+            if ($code >= 500 && $code < 600) {
+                $this->fail($exception);
+
+                return;
+            }
+
+            // Lỗi tạm thời: để Queue retry
+            throw $exception;
+        } finally {
+            $durationMs = round(
+                (hrtime(true) - $startedAt) / 1_000_000,
+                2
+            );
+        }
 
         // Chỉ đánh dấu khi gửi thành công
         $loan->forceFill([
             'overdue_reminder_sent_at' => now(),
         ])->save();
 
-        $sentAt = microtime(true);
-
-        $previousSentAt = Cache::get('overdue_last_email_sent_at');
-
-        $interval = $previousSentAt === null
-            ? null
-            : round($sentAt - (float) $previousSentAt, 3);
-
-        Log::info('Overdue email sent', [
+        // Ghi log sau khi đã lưu trạng thái gửi thành công
+        Log::info('Loan reminder mail attempt', [
             'loan_id' => $loan->id,
-            'sent_at' => now()->format('Y-m-d H:i:s.u'),
-            'interval_seconds' => $interval,
+            'type' => 'overdue',
+            'mailer' => config('mail.default'),
+            'duration_ms' => $durationMs,
+            'send_succeeded' => $sendSucceeded,
         ]);
-
-        Cache::put('overdue_last_email_sent_at', $sentAt, 86400);
     }
 
     public function failed(
