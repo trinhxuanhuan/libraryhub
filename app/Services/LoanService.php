@@ -1,8 +1,9 @@
 <?php
 
 namespace App\Services;
-use App\Enums\LoanStatus;
+
 use App\Enums\BookCopyStatus;
+use App\Enums\LoanStatus;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Loan;
@@ -496,6 +497,7 @@ class LoanService
             ]);
         });
     }
+
     public function cancelLoan(int $loanId, int $memberId): void
     {
         DB::transaction(function () use ($loanId, $memberId) {

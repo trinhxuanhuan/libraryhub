@@ -208,6 +208,7 @@ class LoanRequestTest extends TestCase
             (int) $book->fresh()->available_copies
         );
     }
+
     public function test_member_cannot_cancel_another_members_loan(): void
     {
         $otherMember = User::factory()->create();

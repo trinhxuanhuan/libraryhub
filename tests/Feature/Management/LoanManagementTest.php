@@ -1093,6 +1093,7 @@ class LoanManagementTest extends TestCase
 
         $this->assertDatabaseCount('loans', 0);
     }
+
     public function test_later_pending_loan_cannot_take_last_copy(): void
     {
         [$book, $copy] = $this->createBookWithCopy();

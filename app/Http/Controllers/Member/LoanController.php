@@ -52,6 +52,7 @@ class LoanController extends Controller
             ->route('member.loans.index')
             ->with('success', __('message.loans.renewed'));
     }
+
     public function cancel(
         Request $request,
         Loan $loan,
