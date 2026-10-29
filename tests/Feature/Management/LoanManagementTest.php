@@ -85,6 +85,47 @@ class LoanManagementTest extends TestCase
         return $loan;
     }
 
+    public function test_pending_loans_are_listed_oldest_first(): void
+    {
+        [$book] = $this->createBookWithCopy();
+
+        $pending1 = $this->createPendingLoan($book);
+        $pending2 = $this->createPendingLoan($book);
+        $pendingOldest = $this->createPendingLoan($book);
+        $borrowed = $this->createPendingLoan($book);
+
+        // Hai phiếu cùng thời điểm: ưu tiên ID nhỏ hơn
+        $sameTime = now()->subHour();
+
+        $pending1->forceFill([
+            'created_at' => $sameTime,
+        ])->saveQuietly();
+
+        $pending2->forceFill([
+            'created_at' => $sameTime,
+        ])->saveQuietly();
+
+        // Phiếu có ID lớn hơn nhưng thực tế được yêu cầu sớm hơn
+        $pendingOldest->forceFill([
+            'created_at' => now()->subHours(2),
+        ])->saveQuietly();
+
+        // Phiếu đã mượn phải xếp sau các phiếu chờ duyệt
+        $borrowed->update([
+            'status' => 'borrowed',
+            'due_at' => now()->addDays(7),
+        ]);
+
+        $this->get(route('management.loans.index'))
+            ->assertOk()
+            ->assertSeeTextInOrder([
+                '#'.$pendingOldest->id,
+                '#'.$pending1->id,
+                '#'.$pending2->id,
+                '#'.$borrowed->id,
+            ]);
+    }
+
     public function test_librarian_can_view_loan_details(): void
     {
         [$book] = $this->createBookWithCopy();
@@ -1051,5 +1092,89 @@ class LoanManagementTest extends TestCase
         )->assertForbidden();
 
         $this->assertDatabaseCount('loans', 0);
+    }
+
+    public function test_later_pending_loan_cannot_take_last_copy(): void
+    {
+        [$book, $copy] = $this->createBookWithCopy();
+
+        // Người thứ nhất yêu cầu trước
+        $earlierLoan = $this->createPendingLoan($book);
+
+        // Người thứ hai yêu cầu sau
+        $laterLoan = $this->createPendingLoan($book);
+
+        $item = $laterLoan->items()->firstOrFail();
+
+        // Thủ thư cố duyệt phiếu đến sau
+        $this->post(
+            route('management.loans.issue', $laterLoan),
+            [
+                'copies' => [
+                    $item->id => $copy->id,
+                ],
+            ]
+        )->assertSessionHasErrors('copies');
+
+        // Phiếu đến sau vẫn phải chờ
+        $this->assertSame('pending', $laterLoan->fresh()->status);
+
+        // Bản sách cuối cùng vẫn còn nguyên
+        $this->assertSame(1, $book->fresh()->available_copies);
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy->fresh()->getRawOriginal('status')
+        );
+
+        $this->assertSame('pending', $earlierLoan->fresh()->status);
+    }
+
+    public function test_later_loan_can_be_issued_when_enough_copies_remain(): void
+    {
+        [$book, $copy1] = $this->createBookWithCopy();
+
+        // Bổ sung bản vật lý thứ hai
+        $copy2 = $book->copies()->create([
+            'barcode' => sprintf('TEST-%06d-0002', $book->id),
+            'status' => BookCopyStatus::Available->value,
+        ]);
+
+        $book->update([
+            'total_copies' => 2,
+            'available_copies' => 2,
+        ]);
+
+        // Hai phiếu cùng yêu cầu mượn đầu sách này
+        $earlierLoan = $this->createPendingLoan($book);
+        $laterLoan = $this->createPendingLoan($book);
+
+        $item = $laterLoan->items()->firstOrFail();
+
+        // Duyệt phiếu đến sau
+        $this->post(
+            route('management.loans.issue', $laterLoan),
+            [
+                'copies' => [
+                    $item->id => $copy2->id,
+                ],
+            ]
+        )
+            ->assertRedirect(route('management.loans.show', $laterLoan))
+            ->assertSessionHasNoErrors();
+
+        // Phiếu đến sau được duyệt thành công
+        $this->assertSame('borrowed', $laterLoan->fresh()->status);
+
+        // Phiếu đến trước vẫn đang chờ
+        $this->assertSame('pending', $earlierLoan->fresh()->status);
+
+        // Vẫn còn một bản sách dành cho phiếu đến trước
+        $this->assertSame(1, $book->fresh()->available_copies);
+
+        $this->assertSame(
+            BookCopyStatus::Available->value,
+            $copy1->fresh()->getRawOriginal('status')
+        );
     }
 }
