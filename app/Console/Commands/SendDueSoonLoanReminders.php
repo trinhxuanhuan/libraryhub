@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\UserRole;
 use App\Events\LoanDueSoonReminderRequested;
 use App\Models\Loan;
 use Illuminate\Console\Command;
@@ -33,21 +32,14 @@ class SendDueSoonLoanReminders extends Command
         $failed = 0;
 
         Loan::query()
-            ->where('status', 'borrowed')
-            ->whereNotNull('due_at')
+            ->forLoanReminder()
             ->where('due_at', '>', now())
             ->where('due_at', '<', $endExclusive)
             ->whereNull('due_soon_reminder_sent_at')
             ->whereHas('items', function (Builder $query) {
                 $query->whereNull('resolved_at');
             })
-            ->whereHas('user', function (Builder $query) {
-                $query
-                    ->where('role', UserRole::Member->value)
-                    ->where('is_active', true)
-                    ->whereNotNull('email')
-                    ->where('email', '!=', '');
-            })
+            ->select('loans.id')
             ->chunkById(100, function ($loans) use (
                 &$dispatched,
                 &$failed
