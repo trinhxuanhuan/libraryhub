@@ -36,7 +36,7 @@ class LoanController extends Controller
             ->with('items.book')
             ->where('user_id', $memberId)
             ->orderByDesc('id')
-            ->get();
+            ->paginate(15);
 
         return view('member.loans.index', compact('loans'));
     }
