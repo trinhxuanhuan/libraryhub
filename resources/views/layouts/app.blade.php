@@ -142,6 +142,15 @@
                                     </span>
                                 </li>
 
+                                <li>
+                                    <a
+                                        class="dropdown-item {{ request()->routeIs('profile.*') ? 'active' : '' }}"
+                                        href="{{ route('profile.show') }}"
+                                    >
+                                        Hồ sơ cá nhân
+                                    </a>
+                                </li>
+
                                 <li><hr class="dropdown-divider"></li>
 
                                 <li>
