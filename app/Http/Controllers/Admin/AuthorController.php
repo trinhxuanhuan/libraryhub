@@ -16,7 +16,7 @@ class AuthorController extends Controller
     {
         $authors = Author::withCount('books')
             ->orderBy('id')
-            ->get();
+            ->paginate(10);
 
         return view('admin.authors.index', [
             'authors' => $authors,
