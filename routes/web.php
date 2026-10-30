@@ -13,6 +13,7 @@ use App\Http\Controllers\Management\DashboardController;
 use App\Http\Controllers\Management\LoanController as ManagementLoanController;
 use App\Http\Controllers\Member\BookSelectionController;
 use App\Http\Controllers\Member\LoanController as MemberLoanController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Middleware\CheckManualAuth;
 use App\Models\Book;
 use Illuminate\Support\Facades\Route;
@@ -86,6 +87,33 @@ Route::middleware('manual.guest')
             ->name('login.store');
     });
 
+// Hồ sơ cá nhân - mọi tài khoản đã đăng nhập
+Route::middleware('manual.auth')
+    ->prefix('profile')
+    ->name('profile.')
+    ->group(function () {
+        Route::get('/', [ProfileController::class, 'show'])
+            ->name('show');
+
+        Route::patch('/', [ProfileController::class, 'update'])
+            ->name('update');
+
+        Route::patch('/password', [ProfileController::class, 'requestPasswordChange'])
+            ->middleware('throttle:5,1')
+            ->name('password.request');
+
+        Route::get('/password/verify', [ProfileController::class, 'verifyPasswordChange'])
+            ->name('password.verify');
+
+        Route::post('/password/verify', [ProfileController::class, 'confirmPasswordChange'])
+            ->middleware('throttle:10,1')
+            ->name('password.confirm');
+
+        Route::post('/password/resend', [ProfileController::class, 'resendPasswordChange'])
+            ->middleware('throttle:5,1')
+            ->name('password.resend');
+    });
+
 // Đăng xuất
 Route::post('/logout', [AuthController::class, 'destroy'])
     ->middleware('manual.auth')
@@ -123,6 +151,9 @@ Route::middleware([CheckManualAuth::class, 'role:member'])
         // Gửi toàn bộ danh sách yêu cầu mượn
         Route::post('/selection/submit', [BookSelectionController::class, 'submit'])
             ->name('selection.submit');
+        // Hủy phiếu mượn
+        Route::patch('/loans/{loan}/cancel', [MemberLoanController::class, 'cancel'])
+            ->name('loans.cancel');
     });
 
 // Management Routes - Admin & Librarian

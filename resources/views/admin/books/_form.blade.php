@@ -1,9 +1,7 @@
-
 @php
-    $selectedAuthorIds = old(
-        'author_ids',
-        $book->exists ? $book->authors->modelKeys() : []
-    );
+    $selectedAuthorIds = session()->hasOldInput()
+        ? old('author_ids', [])
+        : ($book->exists ? $book->authors->modelKeys() : []);
 @endphp
 
 {{-- ISBN --}}
@@ -201,62 +199,40 @@
 
 {{-- Tác giả --}}
 <div class="mb-3">
-    <label class="form-label">Tác giả*</label>
+    <label for="author_ids" class="form-label">
+        Tác giả*
+    </label>
 
-    <div class="dropdown">
-        <button
-            type="button"
-            id="authorsDropdown"
-            class="btn btn-outline-secondary dropdown-toggle w-100 text-start @if($errors->has('author_ids') || $errors->has('author_ids.*')) border-danger @endif"
-            data-bs-toggle="dropdown"
-            data-bs-auto-close="outside"
-            aria-expanded="false"
-        >
-            <span id="selectedAuthorsText">
-                @if (count($selectedAuthorIds) > 0)
-                    Đã chọn {{ count($selectedAuthorIds) }} tác giả
-                @else
-                    -- Chọn tác giả --
-                @endif
-            </span>
-        </button>
+    <select
+        id="author_ids"
+        name="author_ids[]"
+        class="form-select"
+        data-searchable-select
+        data-placeholder="Tìm kiếm và chọn tác giả..."
+        multiple
+    >
+        @foreach ($authors as $author)
+            <option
+                value="{{ $author->id }}"
+                @selected(in_array($author->id, $selectedAuthorIds))
+            >
+                {{ $author->name }}
+            </option>
+        @endforeach
+    </select>
 
-        <div
-            class="dropdown-menu w-100 p-3"
-            aria-labelledby="authorsDropdown"
-            style="max-height: 250px; overflow-y: auto;"
-        >
-            @foreach ($authors as $author)
-                <div class="form-check">
-                    <input
-                        type="checkbox"
-                        name="author_ids[]"
-                        value="{{ $author->id }}"
-                        id="author_{{ $author->id }}"
-                        class="form-check-input"
-                        @checked(in_array($author->id, $selectedAuthorIds))
-                    >
-
-                    <label
-                        for="author_{{ $author->id }}"
-                        class="form-check-label"
-                    >
-                        {{ $author->name }}
-                    </label>
-                </div>
-            @endforeach
+    @error('author_ids')
+        <div class="text-danger small mt-1">
+            {{ $message }}
         </div>
-    </div>
+    @enderror
 
-    <div id="author_ids-error" class="text-danger small mt-1">
-        @error('author_ids')
+    @error('author_ids.*')
+        <div class="text-danger small mt-1">
             {{ $message }}
-        @enderror
-
-        @error('author_ids.*')
-            {{ $message }}
-        @enderror
-    </div>
+        </div>
+    @enderror
+</div>
     <div class="mb-3">
         <label for="cover" class="form-label">
             Ảnh bìa sách

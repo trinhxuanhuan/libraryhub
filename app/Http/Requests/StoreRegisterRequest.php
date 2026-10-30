@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\VietnameseMobilePhone;
 use App\Support\EmailNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -17,6 +18,7 @@ class StoreRegisterRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['required', 'string', new VietnameseMobilePhone],
             'password' => ['required', 'string', 'min:8'],
             'password_confirmation' => ['required', 'same:password'],
         ];

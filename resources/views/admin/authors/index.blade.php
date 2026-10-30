@@ -64,6 +64,10 @@
                 </table>
             </div>
 
+            <div class="mt-3">
+                {{ $authors->links('pagination::bootstrap-5') }}
+            </div>
+
             <a href="{{ route('admin.categories.index') }}"
                class="btn btn-outline-secondary">
                 Quản lý thể loại

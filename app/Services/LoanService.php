@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\BookCopyStatus;
+use App\Enums\LoanStatus;
 use App\Models\Book;
 use App\Models\BookCopy;
 use App\Models\Loan;
@@ -153,6 +154,26 @@ class LoanService
                 if ($book === null || $book->trashed()) {
                     throw ValidationException::withMessages([
                         'copies' => 'Một hoặc nhiều đầu sách trong phiếu đã ngừng cung cấp. Không thể giao sách.',
+                    ]);
+                }
+                // Đếm số bản sách mà các phiếu pending đến trước đang cần
+                $olderPendingItems = DB::table('loan_items as li')
+                    ->join('loans as l', 'l.id', '=', 'li.loan_id')
+                    ->where('li.book_id', $book->id)
+                    ->where('l.status', LoanStatus::Pending->value)
+                    ->where(function ($query) use ($loan) {
+                        $query->where('l.created_at', '<', $loan->created_at)
+                            ->orWhere(function ($query) use ($loan) {
+                                $query->where('l.created_at', '=', $loan->created_at)
+                                    ->where('l.id', '<', $loan->id);
+                            });
+                    })
+                    ->count();
+
+                // Không được lấy mất số bản cần dành cho phiếu đến trước
+                if ((int) $book->available_copies <= $olderPendingItems) {
+                    throw ValidationException::withMessages([
+                        'copies' => __('message.loans.prioritize_earlier_requests'),
                     ]);
                 }
 
@@ -473,6 +494,27 @@ class LoanService
             // Ghi nhận thời điểm Librarian xác nhận đã thu tiền
             $item->update([
                 'fine_paid_at' => now(),
+            ]);
+        });
+    }
+
+    public function cancelLoan(int $loanId, int $memberId): void
+    {
+        DB::transaction(function () use ($loanId, $memberId) {
+            $loan = Loan::query()
+                ->whereKey($loanId)
+                ->where('user_id', $memberId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($loan->status !== LoanStatus::Pending->value) {
+                throw ValidationException::withMessages([
+                    'loan' => __('message.loans.cannot_cancel'),
+                ]);
+            }
+
+            $loan->update([
+                'status' => LoanStatus::Cancelled->value,
             ]);
         });
     }

@@ -80,6 +80,32 @@
                             </div>
 
                             <div class="mb-3">
+                                <label for="register-phone" class="form-label fw-semibold">
+                                    Số điện thoại <span class="text-danger">*</span>
+                                </label>
+
+                                <input
+                                    type="tel"
+                                    name="phone"
+                                    id="register-phone"
+                                    class="form-control form-control-lg @error('phone') is-invalid @enderror"
+                                    value="{{ old('phone') }}"
+                                    autocomplete="tel"
+                                    inputmode="tel"
+                                    maxlength="10"
+                                    placeholder="Ví dụ: 0912345678"
+                                    required
+                                    @error('phone') aria-invalid="true" aria-describedby="register-phone-error" @enderror
+                                >
+
+                                @error('phone')
+                                    <div id="register-phone-error" class="invalid-feedback">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div>
+
+                            <div class="mb-3">
                                 <label for="register-password" class="form-label fw-semibold">Mật khẩu</label>
                                 <div class="input-group input-group-lg">
                                     <input

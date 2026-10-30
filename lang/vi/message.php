@@ -60,5 +60,27 @@ return [
         'item_processed' => 'Đã ghi nhận xử lý bản sách thành công.',
         'fine_paid' => 'Đã xác nhận thu tiền phạt thành công.',
         'created' => 'Đã tạo phiếu mượn. Hãy chọn bản sách để giao.',
+        'prioritize_earlier_requests' => 'Cần ưu tiên các phiếu yêu cầu mượn sách trước.',
+        'cannot_cancel' => 'Chỉ có thể hủy phiếu đang chờ duyệt.',
+        'cancelled' => 'Đã hủy yêu cầu mượn sách thành công.',
+    ],
+
+    'profile' => [
+        'updated' => 'Cập nhật hồ sơ thành công.',
+        'password_changed' => 'Đổi mật khẩu thành công.',
+        'invalid_current_password' => 'Mật khẩu hiện tại không đúng.',
+
+        'otp_sent' => 'Mã xác thực đã được gửi đến email của bạn.',
+        'otp_resent' => 'Mã xác thực mới đã được gửi đến email của bạn.',
+
+        'otp_request_expired' => 'Yêu cầu đổi mật khẩu đã hết hạn. Vui lòng bắt đầu lại.',
+        'otp_expired' => 'Mã xác thực không tồn tại hoặc đã hết hạn.',
+        'otp_invalid' => 'Mã xác thực không đúng.',
+        'otp_locked' => 'Bạn đã nhập sai quá số lần cho phép. Vui lòng bắt đầu lại.',
+
+        'otp_send_limit' => 'Bạn đã yêu cầu quá nhiều mã xác thực. Vui lòng thử lại sau.',
+        'otp_cooldown' => 'Vui lòng đợi 60 giây trước khi yêu cầu mã mới.',
+        'otp_send_failed' => 'Không thể gửi mã xác thực. Vui lòng thử lại.',
+        'otp_busy' => 'Đang xử lý một yêu cầu khác. Vui lòng thử lại.',
     ],
 ];
