@@ -176,4 +176,66 @@ class LoanRequestTest extends TestCase
             ->assertSeeText($ownBook->title)
             ->assertDontSeeText($otherBook->title);
     }
+
+    public function test_member_can_cancel_own_pending_loan(): void
+    {
+        $book = $this->createBook();
+
+        // Member gửi yêu cầu mượn
+        $this->post(route('member.loans.store'), [
+            'book_ids' => [$book->id],
+        ])->assertSessionHasNoErrors();
+
+        $loan = Loan::firstOrFail();
+
+        // Member hủy yêu cầu
+        $this->patch(route('member.loans.cancel', $loan))
+            ->assertRedirect(route('member.loans.index'))
+            ->assertSessionHasNoErrors();
+
+        // Phiếu chuyển sang cancelled
+        $this->assertSame('cancelled', $loan->fresh()->status);
+
+        // Không xóa lịch sử phiếu và sách đã yêu cầu
+        $this->assertDatabaseHas('loan_items', [
+            'loan_id' => $loan->id,
+            'book_id' => $book->id,
+        ]);
+
+        // Số lượng sách vẫn giữ nguyên
+        $this->assertSame(
+            1,
+            (int) $book->fresh()->available_copies
+        );
+    }
+
+    public function test_member_cannot_cancel_another_members_loan(): void
+    {
+        $otherMember = User::factory()->create();
+
+        $loan = Loan::create([
+            'user_id' => $otherMember->id,
+            'status' => 'pending',
+        ]);
+
+        $this->patch(route('member.loans.cancel', $loan))
+            ->assertNotFound();
+
+        $this->assertSame('pending', $loan->fresh()->status);
+    }
+
+    public function test_member_cannot_cancel_borrowed_loan(): void
+    {
+        $loan = Loan::create([
+            'user_id' => $this->member->id,
+            'status' => 'borrowed',
+            'borrowed_at' => now(),
+            'due_at' => now()->addDays(14),
+        ]);
+
+        $this->patch(route('member.loans.cancel', $loan))
+            ->assertSessionHasErrors('loan');
+
+        $this->assertSame('borrowed', $loan->fresh()->status);
+    }
 }

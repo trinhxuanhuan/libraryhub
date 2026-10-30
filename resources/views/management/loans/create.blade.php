@@ -36,10 +36,14 @@
                         Thành viên mượn sách
                     </label>
 
-                    <select name="member_id"
-                            id="member_id"
-                            class="form-select"
-                            required>
+                    <select
+                        name="member_id"
+                        id="member_id"
+                        class="form-select"
+                        data-searchable-select
+                        data-placeholder="Tìm kiếm thành viên..."
+                        required
+                    >
                         <option value="">-- Chọn thành viên --</option>
 
                         @foreach ($members as $member)
@@ -51,45 +55,49 @@
                     </select>
                 </div>
 
+                {{-- Chọn đầu sách --}}
                 <div class="mb-4">
-                    <h2 class="h5">Chọn đầu sách</h2>
+                    <label for="book_ids" class="form-label fw-semibold">
+                        Chọn đầu sách
+                    </label>
+
                     <p class="text-muted small">
-                        Có thể chọn nhiều sách trong cùng một phiếu.
+                        Có thể tìm kiếm và chọn nhiều sách trong cùng một phiếu.
                     </p>
 
-                    <div class="border rounded p-3"
-                         style="max-height: 350px; overflow-y: auto;">
+                    <select
+                        name="book_ids[]"
+                        id="book_ids"
+                        class="form-select"
+                        data-searchable-select
+                        data-placeholder="Tìm kiếm và chọn đầu sách..."
+                        multiple
+                    >
+                        @foreach ($books as $book)
+                            <option
+                                value="{{ $book->id }}"
+                                @selected(in_array(
+                                    $book->id,
+                                    array_map('intval', old('book_ids', [])),
+                                    true
+                                ))
+                            >
+                                {{ $book->title }} (Còn {{ $book->available_copies }} bản)
+                            </option>
+                        @endforeach
+                    </select>
 
-                        @forelse ($books as $book)
-                            <div class="form-check mb-3">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="book_ids[]"
-                                    value="{{ $book->id }}"
-                                    id="book-{{ $book->id }}"
-                                    @checked(in_array(
-                                        $book->id,
-                                        array_map('intval', old('book_ids', [])),
-                                        true
-                                    ))
-                                >
+                    @error('book_ids')
+                        <div class="text-danger small mt-1">
+                            {{ $message }}
+                        </div>
+                    @enderror
 
-                                <label class="form-check-label"
-                                       for="book-{{ $book->id }}">
-                                    <strong>{{ $book->title }}</strong>
-
-                                    <span class="text-muted small">
-                                        (Còn {{ $book->available_copies }} bản)
-                                    </span>
-                                </label>
-                            </div>
-                        @empty
-                            <p class="text-muted mb-0">
-                                Không có sách khả dụng.
-                            </p>
-                        @endforelse
-                    </div>
+                    @error('book_ids.*')
+                        <div class="text-danger small mt-1">
+                            {{ $message }}
+                        </div>
+                    @enderror
                 </div>
 
                 <div class="alert alert-info">

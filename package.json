@@ -15,7 +15,8 @@
     "dependencies": {
         "@popperjs/core": "^2.11.8",
         "bootstrap": "^5.3.8",
-        "jquery": "^4.0.0"
+        "jquery": "^4.0.0",
+        "tom-select": "^2.6.2"
     },
     "allowScripts": {
         "esbuild@0.28.2": true

@@ -151,6 +151,9 @@ Route::middleware([CheckManualAuth::class, 'role:member'])
         // Gửi toàn bộ danh sách yêu cầu mượn
         Route::post('/selection/submit', [BookSelectionController::class, 'submit'])
             ->name('selection.submit');
+        // Hủy phiếu mượn
+        Route::patch('/loans/{loan}/cancel', [MemberLoanController::class, 'cancel'])
+            ->name('loans.cancel');
     });
 
 // Management Routes - Admin & Librarian
